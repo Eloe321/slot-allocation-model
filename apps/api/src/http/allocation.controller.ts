@@ -26,12 +26,21 @@ export class AllocationController {
       [id],
     );
     const capacity = cfg[0]?.cabin_capacity ?? 0;
+    const owners = await this.pool.query<{ id: string; name: string; is_hidden: boolean }>(
+      `SELECT DISTINCT o.id, o.name, o.is_hidden
+         FROM owners o JOIN channel_allocations a ON a.owner_id = o.id
+        WHERE a.config_id = $1`,
+      [id],
+    );
+    const ownerName = (ownerId: number | null) =>
+      ownerId === null ? null : (owners.rows.find((o) => Number(o.id) === ownerId)?.name ?? null);
     return {
       configId: id,
       cabinCapacity: capacity,
       violations: checkInvariants(rows, capacity),
       rows: rows.map((r) => ({
         ...r,
+        ownerName: ownerName(r.ownerId),
         rawAvailable: rawAvailable(r),
         nettedAvailable: nettedAvailable(r, rows),
       })),

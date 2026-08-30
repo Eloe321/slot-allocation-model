@@ -8,10 +8,11 @@ import { ExpiryService } from './reservation/expiry.service.js';
 import { CutoffService } from './cutoff/cutoff.service.js';
 import { AllocationController } from './http/allocation.controller.js';
 import { ReservationController } from './http/reservation.controller.js';
+import { ScenarioController } from './http/scenario.controller.js';
 
 @Module({
   imports: [ScheduleModule.forRoot()],
-  controllers: [AllocationController, ReservationController],
+  controllers: [AllocationController, ReservationController, ScenarioController],
   providers: [
     { provide: PG_POOL, useFactory: createPool },
     AllocationRepository,

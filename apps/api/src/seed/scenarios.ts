@@ -133,6 +133,23 @@ export interface AppliedScenario {
   cabinCapacity: number;
 }
 
+export interface ScenarioSummary {
+  key: string;
+  title: string;
+  teaches: string;
+  cabinCapacity: number;
+}
+
+/** The catalogue, without the row fixtures the UI does not need. */
+export function listScenarios(): ScenarioSummary[] {
+  return SCENARIOS.map(({ key, title, teaches, cabinCapacity }) => ({
+    key,
+    title,
+    teaches,
+    cabinCapacity,
+  }));
+}
+
 /** Create a fresh voyage, cabin, and config, then materialize the scenario's rows. */
 export async function applyScenario(pool: Pool, key: string): Promise<AppliedScenario> {
   const scenario = SCENARIOS.find((s) => s.key === key);
@@ -194,4 +211,18 @@ export async function applyScenario(pool: Pool, key: string): Promise<AppliedSce
   } finally {
     client.release();
   }
+}
+
+/**
+ * Rebuild one scenario from scratch.
+ *
+ * Deletes any existing configs for this scenario's vessel before re-applying, so
+ * repeated resets cannot accumulate stale trees a reviewer might then compare
+ * against by accident.
+ */
+export async function resetScenario(pool: Pool, key: string): Promise<AppliedScenario> {
+  const scenario = SCENARIOS.find((s) => s.key === key);
+  if (!scenario) throw new Error(`unknown scenario: ${key}`);
+  await pool.query('DELETE FROM vessels WHERE name = $1', [`MV ${scenario.title}`]);
+  return applyScenario(pool, key);
 }
