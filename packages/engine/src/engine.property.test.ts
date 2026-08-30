@@ -5,8 +5,16 @@ import { planConsumption } from './plan.js';
 import { checkInvariants } from './invariants.js';
 import type { AllocationRow, RequesterIdentity } from './types.js';
 
-/** Generates only structurally valid trees, so failures indicate engine bugs. */
-const validTree = fc
+/**
+ * Trees that are *roughly* shaped like a real config.
+ *
+ * The clamping below only keeps the shape plausible; it deliberately does not
+ * guarantee validity. Every property gates on `fc.pre(checkInvariants(...))`
+ * instead, so the generator and the invariant module are forced to agree on
+ * what "valid" means — a generator that hand-guaranteed validity would happily
+ * keep producing trees the invariant module had since learned to reject.
+ */
+const candidateTree = fc
   .record({
     capacity: fc.integer({ min: 20, max: 200 }),
     counterShare: fc.integer({ min: 0, max: 40 }),
@@ -14,13 +22,20 @@ const validTree = fc
     agencyShare: fc.integer({ min: 0, max: 30 }),
     managedShare: fc.integer({ min: 0, max: 20 }),
     onlineSold: fc.integer({ min: 0, max: 20 }),
+    onlineHeld: fc.integer({ min: 0, max: 10 }),
+    poolHeld: fc.integer({ min: 0, max: 10 }),
+    agencyHeld: fc.integer({ min: 0, max: 10 }),
+    managedHeld: fc.integer({ min: 0, max: 10 }),
+    agencyHidden: fc.boolean(),
+    managedHidden: fc.boolean(),
   })
-  .map(({ capacity, counterShare, poolShare, agencyShare, managedShare, onlineSold }) => {
-    const counter = Math.min(counterShare, Math.floor(capacity / 2));
-    const online = capacity - counter;
-    const pool = Math.min(poolShare, online);
-    const agency = Math.min(agencyShare, online - pool);
-    const managed = Math.min(managedShare, pool);
+  .map((g) => {
+    const counter = Math.min(g.counterShare, Math.floor(g.capacity / 2));
+    const online = g.capacity - counter;
+    const pool = Math.min(g.poolShare, online);
+    const agency = Math.min(g.agencyShare, online - pool);
+    const managed = Math.min(g.managedShare, pool);
+    const onlineSold = Math.min(g.onlineSold, Math.max(0, online - pool - agency));
     const rows: AllocationRow[] = [
       {
         id: 1,
@@ -40,8 +55,8 @@ const validTree = fc
         allocationType: 'direct',
         fundingSource: 'online',
         allocatedSlots: online,
-        soldSlots: Math.min(onlineSold, Math.max(0, online - pool - agency)),
-        heldSlots: 0,
+        soldSlots: onlineSold,
+        heldSlots: Math.min(g.onlineHeld, online - onlineSold),
         ownerIsHidden: false,
       },
       {
@@ -52,7 +67,7 @@ const validTree = fc
         fundingSource: 'online',
         allocatedSlots: pool,
         soldSlots: 0,
-        heldSlots: 0,
+        heldSlots: Math.min(g.poolHeld, pool),
         ownerIsHidden: false,
       },
       {
@@ -63,8 +78,8 @@ const validTree = fc
         fundingSource: 'online',
         allocatedSlots: agency,
         soldSlots: 0,
-        heldSlots: 0,
-        ownerIsHidden: false,
+        heldSlots: Math.min(g.agencyHeld, agency),
+        ownerIsHidden: g.agencyHidden,
       },
       {
         id: 5,
@@ -74,11 +89,11 @@ const validTree = fc
         fundingSource: 'partner_pool',
         allocatedSlots: managed,
         soldSlots: 0,
-        heldSlots: 0,
-        ownerIsHidden: false,
+        heldSlots: Math.min(g.managedHeld, managed),
+        ownerIsHidden: g.managedHidden,
       },
     ];
-    return { rows, capacity };
+    return { rows, capacity: g.capacity };
   });
 
 const identities: RequesterIdentity[] = [
@@ -89,19 +104,20 @@ const identities: RequesterIdentity[] = [
   { kind: 'owner', channel: 'agency', ownerId: 9, managed: true },
 ];
 
+const committedSeats = (rows: AllocationRow[]): number =>
+  rows.reduce((total, r) => total + r.soldSlots + r.heldSlots, 0);
+
 describe('engine safety properties', () => {
-  it('generates only valid trees', () => {
-    fc.assert(
-      fc.property(validTree, ({ rows, capacity }) => {
-        expect(checkInvariants(rows, capacity)).toEqual([]);
-      }),
-      { numRuns: 300 },
-    );
+  it('generates a useful fraction of invariant-valid trees', () => {
+    const sampled = fc.sample(candidateTree, 2000);
+    const valid = sampled.filter(({ rows, capacity }) => checkInvariants(rows, capacity).length === 0);
+    expect(valid.length).toBeGreaterThan(sampled.length / 4);
   });
 
   it('never offers an identity more seats than physically remain', () => {
     fc.assert(
-      fc.property(validTree, fc.integer({ min: 0, max: 4 }), ({ rows, capacity }, idx) => {
+      fc.property(candidateTree, fc.integer({ min: 0, max: 4 }), ({ rows, capacity }, idx) => {
+        fc.pre(checkInvariants(rows, capacity).length === 0);
         const identity = identities[idx]!;
         const trace = selectCandidates(rows, identity);
         const physicallySold = rows
@@ -116,10 +132,11 @@ describe('engine safety properties', () => {
   it('produces splits that exactly satisfy the request, or a shortfall', () => {
     fc.assert(
       fc.property(
-        validTree,
+        candidateTree,
         fc.integer({ min: 0, max: 4 }),
         fc.integer({ min: 1, max: 250 }),
-        ({ rows }, idx, qty) => {
+        ({ rows, capacity }, idx, qty) => {
+          fc.pre(checkInvariants(rows, capacity).length === 0);
           const trace = selectCandidates(rows, identities[idx]!);
           const result = planConsumption(trace, qty);
           if (result.ok) {
@@ -139,10 +156,11 @@ describe('engine safety properties', () => {
   it('never plans more from a row than that row has free', () => {
     fc.assert(
       fc.property(
-        validTree,
+        candidateTree,
         fc.integer({ min: 0, max: 4 }),
         fc.integer({ min: 1, max: 250 }),
-        ({ rows }, idx, qty) => {
+        ({ rows, capacity }, idx, qty) => {
+          fc.pre(checkInvariants(rows, capacity).length === 0);
           const trace = selectCandidates(rows, identities[idx]!);
           const result = planConsumption(trace, qty);
           if (!result.ok) return;
@@ -155,6 +173,50 @@ describe('engine safety properties', () => {
         },
       ),
       { numRuns: 500 },
+    );
+  });
+
+  /**
+   * The headline claim is cross-identity, so the property has to be too.
+   *
+   * Asking a single identity whether it was offered too much is trivially
+   * satisfiable: each identity's view can be perfectly self-consistent while two
+   * views between them hand out the same physical seat. Draining every identity
+   * in turn, against one shared mutable tree, is what actually catches that.
+   */
+  it('draining every identity in turn never exceeds physical capacity', () => {
+    fc.assert(
+      fc.property(candidateTree, ({ rows, capacity }) => {
+        fc.pre(checkInvariants(rows, capacity).length === 0);
+
+        const current = rows.map((r) => ({ ...r }));
+        const startingCommitment = committedSeats(current);
+        let granted = 0;
+
+        for (let iteration = 0; iteration < 1000; iteration += 1) {
+          let progressed = false;
+          for (const identity of identities) {
+            const trace = selectCandidates(current, identity);
+            const result = planConsumption(trace, 1);
+            if (!result.ok) continue;
+            for (const split of result.splits) {
+              const target = current.find((r) => r.id === split.rowId)!;
+              target.heldSlots += split.quantity;
+            }
+            granted += 1;
+            progressed = true;
+          }
+          if (!progressed) break;
+        }
+
+        // Every grant was for exactly one seat, and landed on exactly one row.
+        expect(committedSeats(current)).toBe(startingCommitment + granted);
+        expect(committedSeats(current)).toBeLessThanOrEqual(capacity);
+        expect(
+          checkInvariants(current, capacity).some((v) => v.code === 'row_overcommitted'),
+        ).toBe(false);
+      }),
+      { numRuns: 300 },
     );
   });
 });
