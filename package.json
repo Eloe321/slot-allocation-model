@@ -7,10 +7,12 @@
   },
   "scripts": {
     "build": "pnpm --filter @slot/engine build",
-    "setup": "pnpm install && pnpm build && pnpm --filter @slot/api db:migrate && pnpm --filter @slot/api db:seed",
+    "setup": "pnpm install && pnpm build && pnpm db:migrate && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
     "dev": "pnpm --filter @slot/api dev",
     "test": "pnpm build && pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @slot/api db:migrate",
+    "db:migrate:test": "DATABASE_URL=postgres://slot:slot@localhost:55432/slot_allocation_test pnpm --filter @slot/api db:migrate"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
