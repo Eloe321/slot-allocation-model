@@ -73,6 +73,75 @@ describe('checkInvariants', () => {
     });
   });
 
+  it('flags an online-funded child with no online parent row', () => {
+    const rows = [
+      row({ id: 1, channel: 'counter', allocatedSlots: 60 }),
+      row({ id: 2, channel: 'agency', ownerId: 7, allocationType: 'flexible', allocatedSlots: 20 }),
+    ];
+    expect(checkInvariants(rows, 60)).toContainEqual({
+      code: 'online_child_without_parent',
+      rowId: null,
+      detail: '1 online-funded child row(s) exist with no online parent row',
+    });
+  });
+
+  it('flags a partner-funded child with no partner pool row', () => {
+    const rows = [
+      row({ id: 1, channel: 'online', allocatedSlots: 60 }),
+      row({
+        id: 2,
+        channel: 'agency',
+        ownerId: 9,
+        allocationType: 'guaranteed',
+        fundingSource: 'partner_pool',
+        allocatedSlots: 8,
+      }),
+    ];
+    expect(checkInvariants(rows, 60)).toContainEqual({
+      code: 'partner_child_without_pool',
+      rowId: null,
+      detail: '1 partner-funded child row(s) exist with no partner pool row',
+    });
+  });
+
+  it('flags more than one unowned online direct row', () => {
+    const rows = [
+      row({ id: 1, channel: 'online', allocatedSlots: 30 }),
+      row({ id: 2, channel: 'online', allocatedSlots: 30 }),
+    ];
+    expect(checkInvariants(rows, 100)).toContainEqual({
+      code: 'duplicate_online_parent',
+      rowId: null,
+      detail: '2 unowned online direct rows; expected at most one',
+    });
+  });
+
+  it('flags more than one partner pool row', () => {
+    const rows = [
+      row({ id: 1, channel: 'online', allocatedSlots: 60 }),
+      row({ id: 2, channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 10 }),
+      row({ id: 3, channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 10 }),
+    ];
+    expect(checkInvariants(rows, 100)).toContainEqual({
+      code: 'duplicate_partner_pool',
+      rowId: null,
+      detail: '2 partner pool rows; expected at most one',
+    });
+  });
+
+  it('flags two rows sharing an owner, channel and funding source', () => {
+    const rows = [
+      row({ id: 1, channel: 'online', allocatedSlots: 100 }),
+      row({ id: 2, channel: 'agency', ownerId: 7, allocationType: 'guaranteed', allocatedSlots: 10 }),
+      row({ id: 3, channel: 'agency', ownerId: 7, allocationType: 'flexible', allocatedSlots: 10 }),
+    ];
+    expect(checkInvariants(rows, 100)).toContainEqual({
+      code: 'duplicate_owner_row',
+      rowId: null,
+      detail: 'duplicate rows for owner 7 on channel agency funded from online',
+    });
+  });
+
   it('flags partner children exceeding the pool', () => {
     const rows = [
       row({ id: 1, channel: 'online', allocatedSlots: 50 }),

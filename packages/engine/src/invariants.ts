@@ -1,6 +1,7 @@
 import {
   findPartnerPoolRow,
   findOnlineDirectRow,
+  isChild,
   sumOnlineFundedChildren,
   sumPartnerFundedChildren,
 } from './tree.js';
@@ -10,7 +11,12 @@ export type ViolationCode =
   | 'row_overcommitted'
   | 'direct_exceeds_capacity'
   | 'online_children_exceed_parent'
-  | 'partner_children_exceed_pool';
+  | 'partner_children_exceed_pool'
+  | 'online_child_without_parent'
+  | 'partner_child_without_pool'
+  | 'duplicate_online_parent'
+  | 'duplicate_partner_pool'
+  | 'duplicate_owner_row';
 
 export interface Violation {
   code: ViolationCode;
@@ -75,6 +81,83 @@ export function checkInvariants(rows: AllocationRow[], cabinCapacity: number): V
         code: 'partner_children_exceed_pool',
         rowId: null,
         detail: `partner-funded children total ${partnerChildren} plus pool committed ${poolCommitted} exceed partner pool allocation ${pool.allocatedSlots}`,
+      });
+    }
+  }
+
+  violations.push(...checkStructure(rows));
+
+  return violations;
+}
+
+/**
+ * Rules about which rows may exist at all, independent of any arithmetic.
+ *
+ * A child with no parent row belongs to no physical partition: its seats are
+ * conjured from nothing and are offered on top of, rather than out of, the
+ * cabin. Duplicate parent rows make "the online row" ambiguous, so netting may
+ * be applied to one of them while another is offered un-netted. Duplicate owner
+ * rows are all netted out of the parent but only the first is ever offered back,
+ * stranding the remainder where no channel can reach them.
+ */
+function checkStructure(rows: AllocationRow[]): Violation[] {
+  const violations: Violation[] = [];
+
+  const onlineChildren = rows.filter((r) => isChild(r) && r.fundingSource !== 'partner_pool');
+  if (onlineChildren.length > 0 && !findOnlineDirectRow(rows)) {
+    violations.push({
+      code: 'online_child_without_parent',
+      rowId: null,
+      detail: `${onlineChildren.length} online-funded child row(s) exist with no online parent row`,
+    });
+  }
+
+  const partnerChildren = rows.filter((r) => isChild(r) && r.fundingSource === 'partner_pool');
+  if (partnerChildren.length > 0 && !findPartnerPoolRow(rows)) {
+    violations.push({
+      code: 'partner_child_without_pool',
+      rowId: null,
+      detail: `${partnerChildren.length} partner-funded child row(s) exist with no partner pool row`,
+    });
+  }
+
+  const onlineParents = rows.filter(
+    (r) => r.channel === 'online' && r.ownerId === null && r.allocationType === 'direct',
+  );
+  if (onlineParents.length > 1) {
+    violations.push({
+      code: 'duplicate_online_parent',
+      rowId: null,
+      detail: `${onlineParents.length} unowned online direct rows; expected at most one`,
+    });
+  }
+
+  const pools = rows.filter((r) => r.channel === 'partner_pool');
+  if (pools.length > 1) {
+    violations.push({
+      code: 'duplicate_partner_pool',
+      rowId: null,
+      detail: `${pools.length} partner pool rows; expected at most one`,
+    });
+  }
+
+  // `(channel, ownerId, fundingSource)` is exactly the key `selectPrimary`
+  // resolves an owner with, so anything sharing it is unaddressable.
+  const owned = new Map<string, AllocationRow[]>();
+  for (const r of rows) {
+    if (r.ownerId === null) continue;
+    const key = `${r.channel}|${r.ownerId}|${r.fundingSource}`;
+    const group = owned.get(key);
+    if (group) group.push(r);
+    else owned.set(key, [r]);
+  }
+  for (const group of owned.values()) {
+    const first = group[0];
+    if (group.length > 1 && first) {
+      violations.push({
+        code: 'duplicate_owner_row',
+        rowId: null,
+        detail: `duplicate rows for owner ${first.ownerId} on channel ${first.channel} funded from ${first.fundingSource}`,
       });
     }
   }

@@ -5,7 +5,7 @@ export function rawAvailable(row: AllocationRow): number {
   return Math.max(0, row.allocatedSlots - row.soldSlots - row.heldSlots);
 }
 
-function isChild(row: AllocationRow): boolean {
+export function isChild(row: AllocationRow): boolean {
   return row.allocationType === 'flexible' || row.allocationType === 'guaranteed';
 }
 
