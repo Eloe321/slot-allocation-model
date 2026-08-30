@@ -12,6 +12,7 @@ export {
   findPartnerPoolRow,
   isChild,
   netAgainstChildren,
+  nettedAvailable,
   rawAvailable,
   sumOnlineFundedChildren,
   sumPartnerFundedChildren,

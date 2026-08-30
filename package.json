@@ -2,12 +2,15 @@
   "name": "slot-allocation-remodel",
   "private": true,
   "packageManager": "pnpm@10.20.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "setup": "pnpm install && pnpm --filter @slot/api db:migrate && pnpm --filter @slot/api db:seed",
-    "dev": "pnpm --parallel --filter @slot/api --filter @slot/web dev"
+    "build": "pnpm --filter @slot/engine build",
+    "setup": "pnpm install && pnpm build && pnpm --filter @slot/api db:migrate && pnpm --filter @slot/api db:seed",
+    "dev": "pnpm --filter @slot/api dev",
+    "test": "pnpm build && pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

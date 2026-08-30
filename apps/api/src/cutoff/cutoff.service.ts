@@ -2,13 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Pool } from 'pg';
 import { PG_POOL } from '../db/pool.js';
-import {
-  netAgainstChildren,
-  rawAvailable,
-  sumOnlineFundedChildren,
-  sumPartnerFundedChildren,
-  type AllocationRow,
-} from '@slot/engine';
+import { nettedAvailable, type AllocationRow } from '@slot/engine';
 import { AllocationRepository } from '../allocation/allocation.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 
@@ -55,19 +49,9 @@ export class CutoffService {
 
       // Netted, not raw. A parent's raw free portion includes seats its children
       // already hold; releasing that to counter hands the same seat to two
-      // places. `netAgainstChildren` is the same function the waterfall uses, so
+      // places. `nettedAvailable` is the same function the display path uses, so
       // cutoff and availability can never disagree about what "free" means.
-      const onlineChildren = sumOnlineFundedChildren(ctx.rows);
-      const partnerChildren = sumPartnerFundedChildren(ctx.rows);
-      const nettedFree = (row: AllocationRow): number => {
-        if (row.channel === 'online' && row.allocationType === 'direct') {
-          return rawAvailable(netAgainstChildren(row, onlineChildren));
-        }
-        if (row.channel === 'partner_pool') {
-          return rawAvailable(netAgainstChildren(row, partnerChildren));
-        }
-        return rawAvailable(row);
-      };
+      const nettedFree = (row: AllocationRow): number => nettedAvailable(row, ctx.rows);
 
       const onlineParent = ctx.rows.find(
         (r) => r.channel === 'online' && r.ownerId === null && r.allocationType === 'direct',

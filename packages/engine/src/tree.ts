@@ -89,3 +89,24 @@ export function applyOwnerAvailability(rows: AllocationRow[]): AllocationRow[] {
     isOwnedChannel(r) && r.ownerIsHidden && r.ownerId !== null ? collapseToCommitted(r) : r,
   );
 }
+
+/**
+ * A row's availability with its own children netted out.
+ *
+ * For the two parent rows this differs from `rawAvailable`, and that divergence
+ * is the whole point: the online parent and the partner pool both advertise
+ * seats their children already hold. Every other row is its own leaf, so raw
+ * and netted agree.
+ *
+ * This is the single definition of "netted free" — the display path, the cutoff
+ * sweep, and the waterfall all read it, so they cannot drift apart.
+ */
+export function nettedAvailable(row: AllocationRow, allRows: AllocationRow[]): number {
+  if (row.channel === 'online' && row.ownerId === null && row.allocationType === 'direct') {
+    return rawAvailable(netAgainstChildren(row, sumOnlineFundedChildren(allRows)));
+  }
+  if (row.channel === 'partner_pool') {
+    return rawAvailable(netAgainstChildren(row, sumPartnerFundedChildren(allRows)));
+  }
+  return rawAvailable(row);
+}

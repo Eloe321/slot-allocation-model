@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { checkInvariants, rawAvailable, selectCandidates, sumAvailable } from '@slot/engine';
+import { checkInvariants, nettedAvailable, rawAvailable, sumAvailable } from '@slot/engine';
 import { ReservationService } from '../reservation/reservation.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { CutoffService } from '../cutoff/cutoff.service.js';
@@ -26,9 +26,6 @@ export class AllocationController {
       [id],
     );
     const capacity = cfg[0]?.cabin_capacity ?? 0;
-    const onlineTrace = selectCandidates(rows, { kind: 'online' });
-    const nettedOnline = onlineTrace.candidates[0]?.row;
-
     return {
       configId: id,
       cabinCapacity: capacity,
@@ -36,8 +33,7 @@ export class AllocationController {
       rows: rows.map((r) => ({
         ...r,
         rawAvailable: rawAvailable(r),
-        nettedAvailable:
-          nettedOnline && r.id === nettedOnline.id ? rawAvailable(nettedOnline) : rawAvailable(r),
+        nettedAvailable: nettedAvailable(r, rows),
       })),
     };
   }
