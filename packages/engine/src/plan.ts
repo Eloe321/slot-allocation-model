@@ -1,3 +1,4 @@
+import { rawAvailable } from './tree.js';
 import { sumAvailable, type WaterfallStep, type WaterfallTrace } from './waterfall.js';
 
 export interface Split {
@@ -28,10 +29,7 @@ export function planConsumption(trace: WaterfallTrace, quantity: number): PlanRe
 
   for (const candidate of trace.candidates) {
     if (remaining === 0) break;
-    const free = Math.max(
-      0,
-      candidate.row.allocatedSlots - candidate.row.soldSlots - candidate.row.heldSlots,
-    );
+    const free = rawAvailable(candidate.row);
     if (free === 0) continue;
     const take = Math.min(free, remaining);
     splits.push({ rowId: candidate.row.id, step: candidate.step, quantity: take });

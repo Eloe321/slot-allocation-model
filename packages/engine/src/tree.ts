@@ -22,36 +22,30 @@ export function sumOnlineFundedChildren(rows: AllocationRow[]): number {
 }
 
 /**
- * A view of the online parent whose effective allocation excludes its children.
+ * A view of a parent row whose effective allocation excludes its children.
+ *
+ * The online parent and the partner pool net identically, so they share one
+ * definition: two copies of this rule could drift apart, and a forthcoming SQL
+ * layer has to reproduce exactly one of them.
  *
  * The clamp to `sold + held` is load-bearing: an administrator enlarging a child
  * beyond what the parent already committed would otherwise drive effective
  * allocation negative and make the row report nonsense instead of zero.
  */
-export function netOnlineRow(onlineRow: AllocationRow, childrenAllocated: number): AllocationRow {
-  if (childrenAllocated <= 0) return onlineRow;
-  const committed = onlineRow.soldSlots + onlineRow.heldSlots;
-  const netted = Math.max(committed, onlineRow.allocatedSlots - childrenAllocated);
-  return { ...onlineRow, allocatedSlots: netted };
+export function netAgainstChildren(row: AllocationRow, childrenAllocated: number): AllocationRow {
+  if (childrenAllocated <= 0) return row;
+  const committed = row.soldSlots + row.heldSlots;
+  const netted = Math.max(committed, row.allocatedSlots - childrenAllocated);
+  return { ...row, allocatedSlots: netted };
 }
 
 /** Seats carved out of the partner pool by its own funded children. */
 export function sumPartnerFundedChildren(rows: AllocationRow[]): number {
   return rows.reduce(
-    (total, r) => (r.fundingSource === 'partner_pool' ? total + r.allocatedSlots : total),
+    (total, r) =>
+      isChild(r) && r.fundingSource === 'partner_pool' ? total + r.allocatedSlots : total,
     0,
   );
-}
-
-/** The partner pool netted against the children carved out of it. */
-export function netPartnerPoolRow(
-  poolRow: AllocationRow,
-  childrenAllocated: number,
-): AllocationRow {
-  if (childrenAllocated <= 0) return poolRow;
-  const committed = poolRow.soldSlots + poolRow.heldSlots;
-  const netted = Math.max(committed, poolRow.allocatedSlots - childrenAllocated);
-  return { ...poolRow, allocatedSlots: netted };
 }
 
 /** The shared pool row, if this config has one. */

@@ -29,7 +29,7 @@ describe('rawAvailable', () => {
 
 export { row };
 
-import { sumOnlineFundedChildren, netOnlineRow } from './tree.js';
+import { sumOnlineFundedChildren, netAgainstChildren } from './tree.js';
 
 describe('sumOnlineFundedChildren', () => {
   it('counts flexible and guaranteed children funded from online', () => {
@@ -65,25 +65,25 @@ describe('sumOnlineFundedChildren', () => {
   });
 });
 
-describe('netOnlineRow', () => {
+describe('netAgainstChildren, on the online parent', () => {
   it('reduces effective allocation by the children carved out of it', () => {
     const online = row({ allocatedSlots: 65 });
-    expect(netOnlineRow(online, 35).allocatedSlots).toBe(30);
+    expect(netAgainstChildren(online, 35).allocatedSlots).toBe(30);
   });
 
   it('never nets below what the parent has already committed', () => {
     const online = row({ allocatedSlots: 65, soldSlots: 40, heldSlots: 5 });
     // 65 - 60 = 5, but 45 is already committed. Clamp to 45, not 5.
-    expect(netOnlineRow(online, 60).allocatedSlots).toBe(45);
+    expect(netAgainstChildren(online, 60).allocatedSlots).toBe(45);
   });
 
   it('returns the row untouched when there are no children', () => {
     const online = row({ allocatedSlots: 65 });
-    expect(netOnlineRow(online, 0)).toBe(online);
+    expect(netAgainstChildren(online, 0)).toBe(online);
   });
 });
 
-import { sumPartnerFundedChildren, netPartnerPoolRow, findPartnerPoolRow } from './tree.js';
+import { sumPartnerFundedChildren, findPartnerPoolRow } from './tree.js';
 
 describe('sumPartnerFundedChildren', () => {
   it('counts only children funded from the partner pool', () => {
@@ -103,10 +103,10 @@ describe('sumPartnerFundedChildren', () => {
   });
 });
 
-describe('netPartnerPoolRow', () => {
+describe('netAgainstChildren, on the partner pool', () => {
   it('reduces the pool by its own funded children', () => {
     const pool = row({ channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 20 });
-    expect(netPartnerPoolRow(pool, 8).allocatedSlots).toBe(12);
+    expect(netAgainstChildren(pool, 8).allocatedSlots).toBe(12);
   });
 
   it('clamps to committed capacity', () => {
@@ -116,7 +116,7 @@ describe('netPartnerPoolRow', () => {
       allocatedSlots: 20,
       soldSlots: 15,
     });
-    expect(netPartnerPoolRow(pool, 18).allocatedSlots).toBe(15);
+    expect(netAgainstChildren(pool, 18).allocatedSlots).toBe(15);
   });
 });
 

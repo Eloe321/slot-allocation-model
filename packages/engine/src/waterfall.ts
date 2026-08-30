@@ -3,15 +3,12 @@ import {
   applyOwnerAvailability,
   findOnlineDirectRow,
   findPartnerPoolRow,
-  netOnlineRow,
-  netPartnerPoolRow,
+  isChild,
+  netAgainstChildren,
+  rawAvailable,
   sumOnlineFundedChildren,
   sumPartnerFundedChildren,
 } from './tree.js';
-
-function isChild(row: AllocationRow): boolean {
-  return row.allocationType === 'flexible' || row.allocationType === 'guaranteed';
-}
 
 /** Guaranteed rows are consumed before flexible ones; ties break on id for determinism. */
 function byPreference(a: AllocationRow, b: AllocationRow): number {
@@ -90,12 +87,12 @@ export function selectCandidates(
 
   const rawOnline = findOnlineDirectRow(effective);
   const online = rawOnline
-    ? netOnlineRow(rawOnline, sumOnlineFundedChildren(effective))
+    ? netAgainstChildren(rawOnline, sumOnlineFundedChildren(effective))
     : undefined;
 
   const rawPool = findPartnerPoolRow(effective);
   const pool = rawPool
-    ? netPartnerPoolRow(rawPool, sumPartnerFundedChildren(effective))
+    ? netAgainstChildren(rawPool, sumPartnerFundedChildren(effective))
     : undefined;
 
   const freeForAll = effective.length === 1 && online !== undefined && online.id === effective[0]?.id;
@@ -157,8 +154,5 @@ export function selectCandidates(
 
 /** Total seats currently available across a trace's candidates. */
 export function sumAvailable(trace: WaterfallTrace): number {
-  return trace.candidates.reduce(
-    (total, c) => total + Math.max(0, c.row.allocatedSlots - c.row.soldSlots - c.row.heldSlots),
-    0,
-  );
+  return trace.candidates.reduce((total, c) => total + rawAvailable(c.row), 0);
 }
