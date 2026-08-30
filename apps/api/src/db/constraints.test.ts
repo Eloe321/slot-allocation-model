@@ -172,7 +172,7 @@ describe('pool ceiling constraints', () => {
     }
   });
 
-  it('stops applying the ceiling after cutoff', async () => {
+  it('keeps applying the ceiling after cutoff', async () => {
     const { configId } = await seedConfig(pool);
     const ownerId = await addOwner(pool, 'Agency Seven');
     await addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 40 });
@@ -185,13 +185,23 @@ describe('pool ceiling constraints', () => {
     await pool.query('UPDATE allocation_configs SET cutoff_applied_at = now() WHERE id = $1', [
       configId,
     ]);
-    // The parent is legitimately drained to zero while the guaranteed child remains.
+    // A correct cutoff leaves the parent exactly on its ceiling, never below it,
+    // so the constraint stays armed through the operation that rewrites the
+    // most rows.
     await expect(
       pool.query(
         `UPDATE channel_allocations SET allocated_slots = 0
           WHERE config_id = $1 AND channel = 'online'`,
         [configId],
       ),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/online-funded children/);
+  });
+
+  it('rejects direct allocations exceeding cabin capacity', async () => {
+    const { configId } = await seedConfig(pool, 100);
+    await addRow(pool, configId, { channel: 'counter', allocationType: 'direct', allocatedSlots: 60 });
+    await expect(
+      addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 60 }),
+    ).rejects.toThrow(/exceed cabin capacity/);
   });
 });
