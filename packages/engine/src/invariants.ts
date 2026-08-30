@@ -141,12 +141,21 @@ function checkStructure(rows: AllocationRow[]): Violation[] {
     });
   }
 
-  // `(channel, ownerId, fundingSource)` is exactly the key `selectPrimary`
-  // resolves an owner with, so anything sharing it is unaddressable.
+  // Keyed on `(channel, ownerId)` WITHOUT funding source, deliberately.
+  //
+  // An owner is either managed or it is not — that is a property of the owner,
+  // not of a row. `selectPrimary` filters on `funding === 'partner_pool'` for a
+  // managed requester and `!==` for an ordinary one, so if one owner holds both
+  // an online-funded and a partner-funded row, exactly one of them can never be
+  // matched by any identity. Both are still netted out of their parents, so
+  // those seats are carved away and reachable by nobody.
+  //
+  // Keying on funding source too would treat that pair as legal, which is how
+  // capacity gets silently stranded.
   const owned = new Map<string, AllocationRow[]>();
   for (const r of rows) {
     if (r.ownerId === null) continue;
-    const key = `${r.channel}|${r.ownerId}|${r.fundingSource}`;
+    const key = `${r.channel}|${r.ownerId}`;
     const group = owned.get(key);
     if (group) group.push(r);
     else owned.set(key, [r]);
@@ -157,7 +166,7 @@ function checkStructure(rows: AllocationRow[]): Violation[] {
       violations.push({
         code: 'duplicate_owner_row',
         rowId: null,
-        detail: `duplicate rows for owner ${first.ownerId} on channel ${first.channel} funded from ${first.fundingSource}`,
+        detail: `owner ${first.ownerId} holds ${group.length} rows on channel ${first.channel}; expected at most one`,
       });
     }
   }

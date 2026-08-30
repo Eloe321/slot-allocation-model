@@ -219,4 +219,55 @@ describe('engine safety properties', () => {
       { numRuns: 300 },
     );
   });
+
+  it('leaves no allocated seat unreachable by every identity', () => {
+    // The oversell properties prove no seat is sold twice. This proves the
+    // opposite direction: that draining every identity in turn REACHES the whole
+    // allocated partition, so no capacity is carved out and then addressable by
+    // nobody.
+    //
+    // The identity set includes a managed agency with no row on the config,
+    // because drawing the shared pool without an own row is precisely what the
+    // pool is for — omitting it would report a correctly-reachable pool as
+    // stranded.
+    fc.assert(
+      fc.property(candidateTree, ({ rows, capacity }) => {
+        fc.pre(checkInvariants(rows, capacity).length === 0);
+
+        const reachers: RequesterIdentity[] = [
+          { kind: 'counter' },
+          { kind: 'online' },
+          { kind: 'marketplace' },
+          { kind: 'owner', channel: 'agency', ownerId: 7, managed: false },
+          { kind: 'owner', channel: 'agency', ownerId: 9, managed: true },
+          { kind: 'owner', channel: 'agency', ownerId: 9999, managed: true },
+        ];
+
+        const current = rows.map((r) => ({ ...r }));
+        for (let guard = 0; guard < 2000; guard += 1) {
+          let progressed = false;
+          for (const identity of reachers) {
+            const result = planConsumption(selectCandidates(current, identity), 1);
+            if (!result.ok) continue;
+            for (const split of result.splits) {
+              const target = current.find((r) => r.id === split.rowId);
+              if (target) target.heldSlots += split.quantity;
+            }
+            progressed = true;
+          }
+          if (!progressed) break;
+        }
+
+        const committed = current.reduce((t, r) => t + r.soldSlots + r.heldSlots, 0);
+        const allocatedPartition = rows
+          .filter((r) => r.allocationType === 'direct')
+          .reduce((t, r) => t + r.allocatedSlots, 0);
+
+        // Never more than the partition (no oversell) and never less (no
+        // stranding): draining must land exactly on it.
+        expect(committed).toBe(allocatedPartition);
+      }),
+      { numRuns: 300 },
+    );
+  });
 });

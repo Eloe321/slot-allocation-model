@@ -123,7 +123,7 @@ describe('checkInvariants', () => {
     expect(checkInvariants(rows, 100)).toContainEqual({
       code: 'duplicate_owner_row',
       rowId: null,
-      detail: 'duplicate rows for owner 7 on channel agency funded from online',
+      detail: 'owner 7 holds 2 rows on channel agency; expected at most one',
     });
   });
 
@@ -145,6 +145,30 @@ describe('checkInvariants', () => {
       rowId: null,
       detail:
         'partner-funded children total 25 plus pool committed 0 exceed partner pool allocation 10',
+    });
+  });
+
+  it('flags one owner holding rows funded from both pools', () => {
+    // Legal under the old (channel, owner, funding) key, and it strands
+    // capacity: an owner is managed or ordinary, so exactly one of these two
+    // rows can ever be matched — while both are netted out of their parents.
+    const rows = [
+      row({ id: 1, channel: 'online', allocatedSlots: 80 }),
+      row({ id: 2, channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 20 }),
+      row({ id: 3, channel: 'agency', ownerId: 7, allocationType: 'guaranteed', allocatedSlots: 10 }),
+      row({
+        id: 4,
+        channel: 'agency',
+        ownerId: 7,
+        allocationType: 'guaranteed',
+        fundingSource: 'partner_pool',
+        allocatedSlots: 10,
+      }),
+    ];
+    expect(checkInvariants(rows, 100)).toContainEqual({
+      code: 'duplicate_owner_row',
+      rowId: null,
+      detail: 'owner 7 holds 2 rows on channel agency; expected at most one',
     });
   });
 });

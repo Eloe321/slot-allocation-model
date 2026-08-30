@@ -140,7 +140,7 @@ describe('pool ceiling constraints', () => {
         allocationType: 'flexible',
         allocatedSlots: 10,
       }),
-    ).rejects.toThrow(/one_row_per_owner_channel_funding/);
+    ).rejects.toThrow(/one_row_per_owner_channel/);
   });
 
   it('permits a transiently invalid edit that balances by commit', async () => {
@@ -203,5 +203,33 @@ describe('pool ceiling constraints', () => {
     await expect(
       addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 60 }),
     ).rejects.toThrow(/exceed cabin capacity/);
+  });
+
+  it('rejects one owner funded from both pools on the same channel', async () => {
+    const { configId } = await seedConfig(pool);
+    const ownerId = await addOwner(pool, 'Dual Funded');
+    await addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 80 });
+    await addRow(pool, configId, {
+      channel: 'partner_pool',
+      allocationType: 'flexible',
+      allocatedSlots: 20,
+    });
+    await addRow(pool, configId, {
+      channel: 'agency',
+      ownerId,
+      allocationType: 'guaranteed',
+      allocatedSlots: 10,
+    });
+    // Exactly one of the two could ever be matched, so the other's seats would
+    // be carved out of a parent and reachable by nobody.
+    await expect(
+      addRow(pool, configId, {
+        channel: 'agency',
+        ownerId,
+        allocationType: 'guaranteed',
+        fundingSource: 'partner_pool',
+        allocatedSlots: 10,
+      }),
+    ).rejects.toThrow(/one_row_per_owner_channel/);
   });
 });

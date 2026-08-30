@@ -172,7 +172,7 @@ pool_available = max(0, partner_pool.allocated_slots
    every partner-funded child requires a `partner_pool` row to exist.
 6. At most one unowned `online` direct row, and at most one `partner_pool` row,
    per config.
-7. At most one row per `(channel, owner_id, funding_source)`.
+7. At most one row per `(channel, owner_id)`.
 8. Golden: `physical sold + open holds <= physical capacity` at all times.
 
 Invariants 3 and 4 must include the parent's own committed seats. The weaker
@@ -187,9 +187,15 @@ physical partition at all, and is therefore capacity conjured from nothing.
 
 Invariants 6 and 7 make row identity unambiguous. Without 6, "the online row"
 is whichever the query returns first, and netting may be applied to one row
-while a second is offered un-netted. Without 7, an owner holding both a
-guaranteed and a flexible row has both netted out of the parent but only the
-first offered back, stranding the rest where no channel can reach it.
+while a second is offered un-netted.
+
+Invariant 7 keys on `(channel, owner_id)` and deliberately NOT on funding
+source. An owner is either managed or it is not — that is a property of the
+owner, not of a row — and the primary matcher filters on funding source
+accordingly. An owner holding both an online-funded and a partner-funded row
+therefore has exactly one of them matchable by any identity, while both are
+netted out of their parents: the unmatched row's seats are carved away and
+reachable by nobody.
 
 Invariant 8 must never be checked by summing every row blindly, because
 parents and children overlap by design. It is verified through the netted

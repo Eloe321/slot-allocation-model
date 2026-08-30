@@ -181,7 +181,7 @@ zero.
 4. `Σ partner-funded children + pool.sold + pool.held ≤ pool.allocated`
 5. Every funded child requires its parent row to exist
 6. At most one `online` direct row, and one `partner_pool` row, per config
-7. At most one row per `(channel, owner_id, funding_source)`
+7. At most one row per `(channel, owner_id)` — *not* per funding source
 8. Golden: `physical sold + open holds ≤ physical capacity`, always
 
 Invariants 3 and 4 **include the parent's own committed seats**, and that is not
@@ -189,6 +189,14 @@ cosmetic. The weaker form — children against the parent's allocation alone —
 admits a parent that has sold 60 of 100 while a child holds 50: the child's seats
 are free by its own row, the parent's are committed, and together they exceed the
 partition. I shipped the weaker form first and it oversold by 10.
+
+Invariant 7 keys on `(channel, owner_id)` and deliberately **not** on funding
+source. An owner is managed or it isn't — a property of the owner, not of a row —
+and `selectPrimary` filters on funding accordingly. Let one owner hold both an
+online-funded and a partner-funded row and exactly one is matchable by any
+identity, while **both** are netted out of their parents: the other row's seats
+are carved away and reachable by nobody. I shipped the looser key first, and it
+stranded 10 seats of 100. See [ADR-0013](docs/decisions/0013-one-row-per-owner.md).
 
 Invariant 8 must **never** be checked by summing every row, because parents and
 children overlap by design. A naive sum reports a violation on a perfectly valid
@@ -362,12 +370,14 @@ questions and both matter during an incident.
 
 ## 9. Testing
 
-**113 tests.** 54 in the engine with no database; 59 against real PostgreSQL.
+**116 tests.** 56 in the engine with no database; 60 against real PostgreSQL.
 
 - **Unit** — the engine's rules, in isolation.
-- **Property-based** — fast-check over generated trees. The headline property
-  drains every identity in turn and asserts total commitment never exceeds cabin
-  capacity.
+- **Property-based** — fast-check over generated trees. Two complementary
+  properties, and the pair matters more than either alone: one drains every
+  identity and asserts total commitment never **exceeds** the partition (no
+  oversell); the other asserts draining **reaches** it exactly (no capacity
+  carved out and then addressable by nobody).
 - **Integration** — real Postgres, including the constraint triggers themselves.
 - **Concurrency** — §7.
 
@@ -401,9 +411,10 @@ have been better at.
 | [0010](docs/decisions/0010-ttl-sweeper.md) | Return expired holds with a sweeper |
 | [0011](docs/decisions/0011-identity-free-netting.md) | **Netting must not depend on who is asking** |
 | [0012](docs/decisions/0012-armed-through-cutoff.md) | **Cutoff preserves the partition, so constraints stay armed** |
+| [0013](docs/decisions/0013-one-row-per-owner.md) | **One row per owner per channel, regardless of funding** |
 
-0011 and 0012 document real bugs found in this code, with the reproductions.
-They are the two most worth reading.
+0011, 0012 and 0013 document real bugs found in this code, with their
+reproductions. They are the three most worth reading.
 
 ---
 
@@ -419,9 +430,11 @@ has a record saying what including it would have demonstrated.
 | **Multi-tenancy, identity federation** | Deployment topology of the original system, not part of the allocation problem. |
 | **Payments, auth, real booking flow** | Everything here stops at the allocation boundary on purpose. |
 
-Also honest about what is *not* proven: the drain property shows no seat is sold
-twice, but not that every free seat is **reachable**. A tree could strand
-capacity without duplicating rows and still pass. That wants a second property.
+Also honest about the limits of the proofs. The oversell and reachability
+properties together pin the drained total to exactly the allocated partition,
+but they run over a fixed five-row generator shape — it produces no `reseller`
+rows, and only two owners. A stranding mode that needs a shape outside that
+family would not be generated. The properties are a floor, not a ceiling.
 
 ---
 
@@ -448,6 +461,6 @@ packages/engine/     575 lines, zero I/O — netting, waterfall, planning, invar
 apps/api/            NestJS: locking shell, holds, cutoff, ledger, HTTP
   drizzle/migrations hand-written SQL: constraints, deferred triggers, indexes
 apps/web/            Next.js inspector
-docs/decisions/      12 ADRs
+docs/decisions/      13 ADRs
 docs/evidence/       real test output quoted above
 ```
