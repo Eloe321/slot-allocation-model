@@ -28,3 +28,57 @@ describe('rawAvailable', () => {
 });
 
 export { row };
+
+import { sumOnlineFundedChildren, netOnlineRow } from './tree.js';
+
+describe('sumOnlineFundedChildren', () => {
+  it('counts flexible and guaranteed children funded from online', () => {
+    const rows = [
+      row({ id: 1, allocationType: 'direct', allocatedSlots: 65 }),
+      row({ id: 2, channel: 'agency', ownerId: 7, allocationType: 'guaranteed', allocatedSlots: 10 }),
+      row({ id: 3, channel: 'reseller', ownerId: 3, allocationType: 'flexible', allocatedSlots: 5 }),
+      row({ id: 4, channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 20 }),
+    ];
+    expect(sumOnlineFundedChildren(rows)).toBe(35);
+  });
+
+  it('excludes direct parents', () => {
+    const rows = [
+      row({ id: 1, allocationType: 'direct', allocatedSlots: 65 }),
+      row({ id: 2, channel: 'counter', allocationType: 'direct', allocatedSlots: 20 }),
+    ];
+    expect(sumOnlineFundedChildren(rows)).toBe(0);
+  });
+
+  it('excludes partner-funded children, which draw the pool instead', () => {
+    const rows = [
+      row({
+        id: 5,
+        channel: 'agency',
+        ownerId: 9,
+        allocationType: 'guaranteed',
+        fundingSource: 'partner_pool',
+        allocatedSlots: 8,
+      }),
+    ];
+    expect(sumOnlineFundedChildren(rows)).toBe(0);
+  });
+});
+
+describe('netOnlineRow', () => {
+  it('reduces effective allocation by the children carved out of it', () => {
+    const online = row({ allocatedSlots: 65 });
+    expect(netOnlineRow(online, 35).allocatedSlots).toBe(30);
+  });
+
+  it('never nets below what the parent has already committed', () => {
+    const online = row({ allocatedSlots: 65, soldSlots: 40, heldSlots: 5 });
+    // 65 - 60 = 5, but 45 is already committed. Clamp to 45, not 5.
+    expect(netOnlineRow(online, 60).allocatedSlots).toBe(45);
+  });
+
+  it('returns the row untouched when there are no children', () => {
+    const online = row({ allocatedSlots: 65 });
+    expect(netOnlineRow(online, 0)).toBe(online);
+  });
+});
