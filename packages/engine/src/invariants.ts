@@ -49,24 +49,34 @@ export function checkInvariants(rows: AllocationRow[], cabinCapacity: number): V
     });
   }
 
+  // A parent's own sold and held seats draw on the same physical partition its
+  // children were carved out of, so they belong on the same side of the ceiling.
+  // Comparing children against the parent's allocation alone lets an online row
+  // that has already sold 60 of 100 still advertise a 50-seat child as valid.
   const onlineParent = findOnlineDirectRow(rows);
   const onlineChildren = sumOnlineFundedChildren(rows);
-  if (onlineParent && onlineChildren > onlineParent.allocatedSlots) {
-    violations.push({
-      code: 'online_children_exceed_parent',
-      rowId: null,
-      detail: `online-funded children total ${onlineChildren}, online parent allocates ${onlineParent.allocatedSlots}`,
-    });
+  if (onlineParent) {
+    const parentCommitted = onlineParent.soldSlots + onlineParent.heldSlots;
+    if (onlineChildren + parentCommitted > onlineParent.allocatedSlots) {
+      violations.push({
+        code: 'online_children_exceed_parent',
+        rowId: null,
+        detail: `online-funded children total ${onlineChildren} plus parent committed ${parentCommitted} exceed online parent allocation ${onlineParent.allocatedSlots}`,
+      });
+    }
   }
 
   const pool = findPartnerPoolRow(rows);
   const partnerChildren = sumPartnerFundedChildren(rows);
-  if (pool && partnerChildren > pool.allocatedSlots) {
-    violations.push({
-      code: 'partner_children_exceed_pool',
-      rowId: null,
-      detail: `partner-funded children total ${partnerChildren}, partner pool allocates ${pool.allocatedSlots}`,
-    });
+  if (pool) {
+    const poolCommitted = pool.soldSlots + pool.heldSlots;
+    if (partnerChildren + poolCommitted > pool.allocatedSlots) {
+      violations.push({
+        code: 'partner_children_exceed_pool',
+        rowId: null,
+        detail: `partner-funded children total ${partnerChildren} plus pool committed ${poolCommitted} exceed partner pool allocation ${pool.allocatedSlots}`,
+      });
+    }
   }
 
   return violations;

@@ -39,9 +39,13 @@ describe('checkInvariants', () => {
 
   it('flags a row committed beyond its allocation', () => {
     const rows = [row({ id: 1, allocatedSlots: 5, soldSlots: 4, heldSlots: 3 })];
-    expect(checkInvariants(rows, 100)).toEqual([
-      { code: 'row_overcommitted', rowId: 1, detail: 'sold 4 + held 3 exceeds allocated 5' },
-    ]);
+    // The row is also the online parent, so its own overcommitment now trips
+    // the online ceiling as well; this test is about the per-row code.
+    expect(checkInvariants(rows, 100)).toContainEqual({
+      code: 'row_overcommitted',
+      rowId: 1,
+      detail: 'sold 4 + held 3 exceeds allocated 5',
+    });
   });
 
   it('flags direct allocations exceeding cabin capacity', () => {
@@ -64,7 +68,8 @@ describe('checkInvariants', () => {
     expect(checkInvariants(rows, 100)).toContainEqual({
       code: 'online_children_exceed_parent',
       rowId: null,
-      detail: 'online-funded children total 30, online parent allocates 10',
+      detail:
+        'online-funded children total 30 plus parent committed 0 exceed online parent allocation 10',
     });
   });
 
@@ -84,7 +89,8 @@ describe('checkInvariants', () => {
     expect(checkInvariants(rows, 100)).toContainEqual({
       code: 'partner_children_exceed_pool',
       rowId: null,
-      detail: 'partner-funded children total 25, partner pool allocates 10',
+      detail:
+        'partner-funded children total 25 plus pool committed 0 exceed partner pool allocation 10',
     });
   });
 });
