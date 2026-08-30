@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import type { AllocationRow } from '@slot/engine';
+import { PG_POOL } from '../db/pool.js';
 
 export interface ConfigContext {
   client: PoolClient;
@@ -42,7 +43,7 @@ function toEngineRow(r: DbRow): AllocationRow {
 
 @Injectable()
 export class AllocationRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   /**
    * Run `fn` inside one transaction with the config and all of its allocation

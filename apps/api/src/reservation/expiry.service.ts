@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Pool } from 'pg';
 import { AllocationRepository } from '../allocation/allocation.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { PG_POOL } from '../db/pool.js';
 
 /**
  * Returns seats from holds whose TTL has passed.
@@ -18,7 +19,7 @@ export class ExpiryService {
   constructor(
     private readonly repo: AllocationRepository,
     private readonly ledger: LedgerService,
-    private readonly pool: Pool,
+    @Inject(PG_POOL) private readonly pool: Pool,
   ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)

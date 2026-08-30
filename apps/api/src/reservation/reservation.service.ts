@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
+import { PG_POOL } from '../db/pool.js';
 import {
   planConsumption,
   selectCandidates,
+  type AllocationRow,
   type RequesterIdentity,
   type Split,
   type WaterfallTrace,
@@ -33,7 +35,7 @@ export class ReservationService {
   constructor(
     private readonly repo: AllocationRepository,
     private readonly ledger: LedgerService,
-    private readonly pool: Pool,
+    @Inject(PG_POOL) private readonly pool: Pool,
   ) {}
 
   /**
@@ -74,8 +76,8 @@ export class ReservationService {
     });
   }
 
-  /** Read-only waterfall preview. Takes no locks and changes nothing. */
-  async preview(configId: number, identity: RequesterIdentity): Promise<WaterfallTrace> {
+  /** Load a config's rows in engine shape, without locking. */
+  async rowsFor(configId: number): Promise<AllocationRow[]> {
     const { rows } = await this.pool.query(
       `SELECT a.id, a.channel, a.owner_id, a.allocation_type, a.funding_source,
               a.allocated_slots, a.sold_slots, a.held_slots, o.is_hidden AS owner_is_hidden
@@ -84,20 +86,22 @@ export class ReservationService {
         WHERE a.config_id = $1 ORDER BY a.id`,
       [configId],
     );
-    return selectCandidates(
-      rows.map((r) => ({
-        id: Number(r.id),
-        channel: r.channel,
-        ownerId: r.owner_id === null ? null : Number(r.owner_id),
-        allocationType: r.allocation_type,
-        fundingSource: r.funding_source,
-        allocatedSlots: r.allocated_slots,
-        soldSlots: r.sold_slots,
-        heldSlots: r.held_slots,
-        ownerIsHidden: r.owner_is_hidden ?? false,
-      })),
-      identity,
-    );
+    return rows.map((r) => ({
+      id: Number(r.id),
+      channel: r.channel,
+      ownerId: r.owner_id === null ? null : Number(r.owner_id),
+      allocationType: r.allocation_type,
+      fundingSource: r.funding_source,
+      allocatedSlots: r.allocated_slots,
+      soldSlots: r.sold_slots,
+      heldSlots: r.held_slots,
+      ownerIsHidden: r.owner_is_hidden ?? false,
+    }));
+  }
+
+  /** Read-only waterfall preview. Takes no locks and changes nothing. */
+  async preview(configId: number, identity: RequesterIdentity): Promise<WaterfallTrace> {
+    return selectCandidates(await this.rowsFor(configId), identity);
   }
 
   /**

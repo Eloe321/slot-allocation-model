@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
+import { PG_POOL } from '../db/pool.js';
 
 export type LedgerEventType =
   | 'reserve'
@@ -43,7 +44,7 @@ export interface LedgerEntry {
  */
 @Injectable()
 export class LedgerService {
-  constructor(private readonly pool: Pool) {}
+  constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async record(client: PoolClient, input: MovementInput): Promise<void> {
     await client.query(
