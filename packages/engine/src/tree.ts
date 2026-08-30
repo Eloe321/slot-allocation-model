@@ -1,4 +1,4 @@
-import type { AllocationRow } from './types.js';
+import type { AllocationRow, RequesterIdentity } from './types.js';
 
 /** Free seats on a single row, before any parent netting. */
 export function rawAvailable(row: AllocationRow): number {
@@ -63,5 +63,40 @@ export function findPartnerPoolRow(rows: AllocationRow[]): AllocationRow | undef
 export function findOnlineDirectRow(rows: AllocationRow[]): AllocationRow | undefined {
   return rows.find(
     (r) => r.channel === 'online' && r.ownerId === null && r.allocationType === 'direct',
+  );
+}
+
+/** A view of a row with no free entitlement, retaining its committed seats. */
+export function collapseToCommitted(row: AllocationRow): AllocationRow {
+  return { ...row, allocatedSlots: row.soldSlots + row.heldSlots };
+}
+
+function isOwnedChannel(row: AllocationRow): boolean {
+  return row.channel === 'agency' || row.channel === 'reseller';
+}
+
+function isRequestersOwnRow(row: AllocationRow, identity: RequesterIdentity): boolean {
+  return (
+    identity.kind === 'owner' &&
+    row.channel === identity.channel &&
+    row.ownerId === identity.ownerId
+  );
+}
+
+/**
+ * Collapse every hidden-owner child except the requester's own row.
+ *
+ * A hidden owner keeps no free seats, but its sold and held seats must remain
+ * carved out of the parent — restoring them would let the parent resell capacity
+ * that is already committed.
+ */
+export function applyOwnerAvailability(
+  rows: AllocationRow[],
+  identity: RequesterIdentity,
+): AllocationRow[] {
+  return rows.map((r) =>
+    isOwnedChannel(r) && r.ownerIsHidden && r.ownerId !== null && !isRequestersOwnRow(r, identity)
+      ? collapseToCommitted(r)
+      : r,
   );
 }

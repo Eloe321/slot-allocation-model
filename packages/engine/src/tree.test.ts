@@ -130,3 +130,57 @@ describe('findPartnerPoolRow', () => {
     expect(findPartnerPoolRow([row({ id: 1 })])).toBeUndefined();
   });
 });
+
+import { collapseToCommitted, applyOwnerAvailability } from './tree.js';
+
+describe('collapseToCommitted', () => {
+  it('reduces allocation to exactly what is sold and held', () => {
+    const r = row({ allocatedSlots: 10, soldSlots: 3, heldSlots: 2 });
+    const collapsed = collapseToCommitted(r);
+    expect(collapsed.allocatedSlots).toBe(5);
+    expect(rawAvailable(collapsed)).toBe(0);
+  });
+});
+
+describe('applyOwnerAvailability', () => {
+  const hidden = row({
+    id: 2,
+    channel: 'agency',
+    ownerId: 7,
+    allocationType: 'guaranteed',
+    allocatedSlots: 10,
+    soldSlots: 4,
+    ownerIsHidden: true,
+  });
+
+  it('collapses a hidden row for an unrelated requester', () => {
+    const [result] = applyOwnerAvailability([hidden], { kind: 'online' });
+    expect(result?.allocatedSlots).toBe(4);
+  });
+
+  it('leaves the row intact for its own owner', () => {
+    const [result] = applyOwnerAvailability([hidden], {
+      kind: 'owner',
+      channel: 'agency',
+      ownerId: 7,
+      managed: false,
+    });
+    expect(result?.allocatedSlots).toBe(10);
+  });
+
+  it('collapses a hidden row belonging to a different owner', () => {
+    const [result] = applyOwnerAvailability([hidden], {
+      kind: 'owner',
+      channel: 'agency',
+      ownerId: 99,
+      managed: false,
+    });
+    expect(result?.allocatedSlots).toBe(4);
+  });
+
+  it('leaves visible rows untouched', () => {
+    const visible = row({ id: 3, channel: 'agency', ownerId: 8, allocationType: 'flexible', allocatedSlots: 6 });
+    const [result] = applyOwnerAvailability([visible], { kind: 'online' });
+    expect(result).toBe(visible);
+  });
+});
