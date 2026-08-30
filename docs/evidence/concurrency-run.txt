@@ -1,0 +1,14 @@
+
+> @slot/api@0.1.0 test /Users/geloes/Slot-Allocation-Remodel/apps/api
+> vitest run src/reservation/oversell.concurrency.test.ts
+
+
+ RUN  v3.2.7 /Users/geloes/Slot-Allocation-Remodel/apps/api
+
+ ✓ src/reservation/oversell.concurrency.test.ts (3 tests) 630ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  17:14:49
+   Duration  1.48s (transform 153ms, setup 0ms, collect 471ms, tests 630ms, environment 0ms, prepare 135ms)
+
