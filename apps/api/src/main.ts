@@ -7,7 +7,16 @@ import { BadRequestException } from '@nestjs/common';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000' });
+  // Any localhost port, because this runs only on a developer's own machine and
+  // pinning one port breaks anyone whose 3000 is already taken. WEB_ORIGIN
+  // overrides it if a specific origin is ever needed.
+  const allowed = process.env.WEB_ORIGIN;
+  app.enableCors({
+    origin: allowed
+      ? allowed
+      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) =>
+          callback(null, !origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)),
+  });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // A shortfall is a 409 with numbers, not a 500. The inspector renders these.
