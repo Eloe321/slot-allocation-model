@@ -35,7 +35,8 @@ export interface Trace {
   candidates: Candidate[];
   skipped: Skipped[];
   freeForAll: boolean;
-  available: number;
+  /** Present only on the preview endpoint; a reserve response omits it. */
+  available?: number;
 }
 
 export interface Split { rowId: number; step: WaterfallStep; quantity: number }

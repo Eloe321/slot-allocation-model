@@ -1,10 +1,13 @@
-import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
+import './globals.css';
 
-export const metadata = {
-  title: 'Slot Allocation Inspector',
+export const metadata: Metadata = {
+  title: 'Slot allocation inspector',
+  description:
+    'A live inspector for a partitioned-capacity allocation engine: the tree, the netting divergence, and the waterfall.',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>{children}</body>
