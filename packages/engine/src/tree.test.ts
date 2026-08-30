@@ -82,3 +82,51 @@ describe('netOnlineRow', () => {
     expect(netOnlineRow(online, 0)).toBe(online);
   });
 });
+
+import { sumPartnerFundedChildren, netPartnerPoolRow, findPartnerPoolRow } from './tree.js';
+
+describe('sumPartnerFundedChildren', () => {
+  it('counts only children funded from the partner pool', () => {
+    const rows = [
+      row({ id: 4, channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 20 }),
+      row({
+        id: 5,
+        channel: 'agency',
+        ownerId: 9,
+        allocationType: 'guaranteed',
+        fundingSource: 'partner_pool',
+        allocatedSlots: 8,
+      }),
+      row({ id: 2, channel: 'agency', ownerId: 7, allocationType: 'guaranteed', allocatedSlots: 10 }),
+    ];
+    expect(sumPartnerFundedChildren(rows)).toBe(8);
+  });
+});
+
+describe('netPartnerPoolRow', () => {
+  it('reduces the pool by its own funded children', () => {
+    const pool = row({ channel: 'partner_pool', allocationType: 'flexible', allocatedSlots: 20 });
+    expect(netPartnerPoolRow(pool, 8).allocatedSlots).toBe(12);
+  });
+
+  it('clamps to committed capacity', () => {
+    const pool = row({
+      channel: 'partner_pool',
+      allocationType: 'flexible',
+      allocatedSlots: 20,
+      soldSlots: 15,
+    });
+    expect(netPartnerPoolRow(pool, 18).allocatedSlots).toBe(15);
+  });
+});
+
+describe('findPartnerPoolRow', () => {
+  it('finds the pool row', () => {
+    const pool = row({ id: 4, channel: 'partner_pool', allocationType: 'flexible' });
+    expect(findPartnerPoolRow([row({ id: 1 }), pool])?.id).toBe(4);
+  });
+
+  it('returns undefined when the config has no pool', () => {
+    expect(findPartnerPoolRow([row({ id: 1 })])).toBeUndefined();
+  });
+});
