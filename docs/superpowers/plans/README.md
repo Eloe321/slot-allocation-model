@@ -4,7 +4,7 @@ Sequenced. Each plan produces working, testable software on its own.
 
 | Plan | Covers | Status |
 |---|---|---|
-| [01 — Pure engine](2026-08-30-01-pure-engine.md) | Workspace, domain types, netting, waterfall, consumption planning, invariants, property tests | Written |
+| [01 — Pure engine](2026-08-30-01-pure-engine.md) | Workspace, domain types, netting, waterfall, consumption planning, invariants, property tests | **Complete** — 54 tests, plus a post-review correctness pass (see below) |
 | [02 — Persistence and API](2026-08-30-02-persistence-and-api.md) | Postgres schema, deferred constraint triggers, locking repository, holds, cutoff, ledger, concurrency proof, HTTP surface, scenario seeds | Written |
 | 03 — Inspector UI | Next.js tree, request panel, waterfall trace, ledger stream | Written at its phase boundary |
 | 04 — README and ADRs | The source-of-truth README, ten decision records | Written at its phase boundary |
@@ -48,3 +48,37 @@ maps to a task:
 | §12-13 README and ADRs | Plan 04 |
 | §14 Reproducibility | 02 Tasks 1, 12 |
 | §15 Hygiene | Commit messages throughout |
+
+## Plan 01 post-review correctness pass
+
+A code review after Plan 01's tasks found three input classes where the engine
+offered more seats than physically existed, all on trees its own
+`checkInvariants` declared valid. All three were reproduced before being fixed:
+
+| | tree (cabin capacity) | offered | physically free |
+|---|---|---|---|
+| C1 | hidden owner, 100-seat parent | 100 to *two* identities independently | 100 |
+| C2 | parent sold 60/100, child allocated 50 | 50 | 40 |
+| C3 | online-funded child with no online parent row | 80 | 60 |
+
+**C1** was the structural one. `applyOwnerAvailability` exempted the requester's
+own row from the hidden-owner collapse, so the netted tree differed per
+requester: other channels saw the child collapsed and the parent hand its seats
+back, while the masked owner still held them. Each view was self-consistent;
+together they double-counted. The fix removed the exemption, which also made
+`tree.ts` identity-free — netting no longer knows who is asking, so
+cross-identity double-counting is impossible by construction rather than by test.
+
+**C2 and C3 were spec defects**, not just code defects. The design spec's
+invariants 3 and 4 compared children against the parent's allocation alone. Had
+Plan 02 transcribed them literally into constraint triggers, both layers would
+have encoded the same wrong rule and the defence-in-depth argument would have
+been hollow. [The spec was corrected](../specs/2026-08-30-slot-allocation-remodel-design.md)
+before any schema was written.
+
+All three survived 1300 property runs because the property suite asserted a
+*per-identity* bound where the spec's headline claim is *cross-identity*, over a
+generator that never produced a hidden owner or a held seat. The replacement
+drains every identity in turn and asserts total commitment never exceeds cabin
+capacity; it was validated by temporarily reintroducing C1 and confirming it
+failed, shrinking to 21 seats on a 20-seat cabin.
