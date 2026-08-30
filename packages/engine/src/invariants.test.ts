@@ -1,21 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { row } from './test-support.js';
 import { checkInvariants } from './invariants.js';
-import type { AllocationRow } from './types.js';
-
-function row(over: Partial<AllocationRow> = {}): AllocationRow {
-  return {
-    id: 1,
-    channel: 'online',
-    ownerId: null,
-    allocationType: 'direct',
-    fundingSource: 'online',
-    allocatedSlots: 0,
-    soldSlots: 0,
-    heldSlots: 0,
-    ownerIsHidden: false,
-    ...over,
-  };
-}
 
 describe('checkInvariants', () => {
   it('accepts a well-formed tree', () => {

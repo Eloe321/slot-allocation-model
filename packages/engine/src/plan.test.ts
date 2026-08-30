@@ -1,22 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { row } from './test-support.js';
 import { planConsumption } from './plan.js';
 import { selectCandidates } from './waterfall.js';
 import type { AllocationRow } from './types.js';
-
-function row(over: Partial<AllocationRow> = {}): AllocationRow {
-  return {
-    id: 1,
-    channel: 'online',
-    ownerId: null,
-    allocationType: 'direct',
-    fundingSource: 'online',
-    allocatedSlots: 0,
-    soldSlots: 0,
-    heldSlots: 0,
-    ownerIsHidden: false,
-    ...over,
-  };
-}
 
 const tree: AllocationRow[] = [
   row({ id: 3, channel: 'online', allocatedSlots: 65 }),

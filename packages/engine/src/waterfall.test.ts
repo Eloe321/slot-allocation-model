@@ -1,21 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { row } from './test-support.js';
 import { selectPrimary } from './waterfall.js';
 import type { AllocationRow } from './types.js';
-
-function row(over: Partial<AllocationRow> = {}): AllocationRow {
-  return {
-    id: 1,
-    channel: 'online',
-    ownerId: null,
-    allocationType: 'direct',
-    fundingSource: 'online',
-    allocatedSlots: 0,
-    soldSlots: 0,
-    heldSlots: 0,
-    ownerIsHidden: false,
-    ...over,
-  };
-}
 
 describe('selectPrimary', () => {
   it('matches the counter direct row', () => {
@@ -76,8 +62,6 @@ describe('selectPrimary', () => {
     ).toBeUndefined();
   });
 });
-
-export { row };
 
 import { selectCandidates } from './waterfall.js';
 
