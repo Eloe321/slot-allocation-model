@@ -154,33 +154,25 @@ describe('applyOwnerAvailability', () => {
   });
 
   it('collapses a hidden row for an unrelated requester', () => {
-    const [result] = applyOwnerAvailability([hidden], { kind: 'online' });
+    const [result] = applyOwnerAvailability([hidden]);
     expect(result?.allocatedSlots).toBe(4);
   });
 
-  it('leaves the row intact for its own owner', () => {
-    const [result] = applyOwnerAvailability([hidden], {
-      kind: 'owner',
-      channel: 'agency',
-      ownerId: 7,
-      managed: false,
-    });
-    expect(result?.allocatedSlots).toBe(10);
+  it('collapses a hidden row even for its own owner', () => {
+    // Netting is identity-free: the masked owner sees the same collapsed tree
+    // every other channel sees, so the freed seats are only ever offered once.
+    const [result] = applyOwnerAvailability([hidden]);
+    expect(result?.allocatedSlots).toBe(4);
   });
 
   it('collapses a hidden row belonging to a different owner', () => {
-    const [result] = applyOwnerAvailability([hidden], {
-      kind: 'owner',
-      channel: 'agency',
-      ownerId: 99,
-      managed: false,
-    });
+    const [result] = applyOwnerAvailability([hidden]);
     expect(result?.allocatedSlots).toBe(4);
   });
 
   it('leaves visible rows untouched', () => {
     const visible = row({ id: 3, channel: 'agency', ownerId: 8, allocationType: 'flexible', allocatedSlots: 6 });
-    const [result] = applyOwnerAvailability([visible], { kind: 'online' });
+    const [result] = applyOwnerAvailability([visible]);
     expect(result).toBe(visible);
   });
 });

@@ -1,4 +1,4 @@
-import type { AllocationRow, RequesterIdentity } from './types.js';
+import type { AllocationRow } from './types.js';
 
 /** Free seats on a single row, before any parent netting. */
 export function rawAvailable(row: AllocationRow): number {
@@ -75,28 +75,23 @@ function isOwnedChannel(row: AllocationRow): boolean {
   return row.channel === 'agency' || row.channel === 'reseller';
 }
 
-function isRequestersOwnRow(row: AllocationRow, identity: RequesterIdentity): boolean {
-  return (
-    identity.kind === 'owner' &&
-    row.channel === identity.channel &&
-    row.ownerId === identity.ownerId
-  );
-}
-
 /**
- * Collapse every hidden-owner child except the requester's own row.
+ * Collapse every hidden-owner child, for every requester — including the masked
+ * owner itself.
  *
  * A hidden owner keeps no free seats, but its sold and held seats must remain
  * carved out of the parent — restoring them would let the parent resell capacity
  * that is already committed.
+ *
+ * The collapse is deliberately identity-free. Exempting the requester's own row
+ * would make the netted tree differ per requester: every other channel would see
+ * the child collapsed and the parent hand its free seats back, while the masked
+ * owner went on holding those same seats. Each view is self-consistent, but
+ * together they sell the same physical seat twice. Netting must not depend on
+ * who is asking — one tree, one answer, for everyone.
  */
-export function applyOwnerAvailability(
-  rows: AllocationRow[],
-  identity: RequesterIdentity,
-): AllocationRow[] {
+export function applyOwnerAvailability(rows: AllocationRow[]): AllocationRow[] {
   return rows.map((r) =>
-    isOwnedChannel(r) && r.ownerIsHidden && r.ownerId !== null && !isRequestersOwnRow(r, identity)
-      ? collapseToCommitted(r)
-      : r,
+    isOwnedChannel(r) && r.ownerIsHidden && r.ownerId !== null ? collapseToCommitted(r) : r,
   );
 }

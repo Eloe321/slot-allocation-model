@@ -84,7 +84,7 @@ export function selectCandidates(
   rows: AllocationRow[],
   identity: RequesterIdentity,
 ): WaterfallTrace {
-  const effective = applyOwnerAvailability(rows, identity);
+  const effective = applyOwnerAvailability(rows);
   const candidates: Candidate[] = [];
   const skipped: SkippedCandidate[] = [];
 
