@@ -166,11 +166,32 @@ pool_available = max(0, partner_pool.allocated_slots
 
 1. Per row: `sold + held <= allocated`.
 2. `SUM(direct allocations) <= cabin capacity`.
-3. `SUM(online-funded children) <= online.allocated`.
-4. `SUM(partner_pool-funded children) <= partner_pool.allocated`.
-5. Golden: `physical sold + open holds <= physical capacity` at all times.
+3. `SUM(online-funded children) + online.sold + online.held <= online.allocated`.
+4. `SUM(partner-funded children) + pool.sold + pool.held <= pool.allocated`.
+5. Every online-funded child requires an unowned `online` direct row to exist;
+   every partner-funded child requires a `partner_pool` row to exist.
+6. At most one unowned `online` direct row, and at most one `partner_pool` row,
+   per config.
+7. At most one row per `(channel, owner_id, funding_source)`.
+8. Golden: `physical sold + open holds <= physical capacity` at all times.
 
-Invariant 5 must never be checked by summing every row blindly, because
+Invariants 3 and 4 must include the parent's own committed seats. The weaker
+form — comparing children against the parent's *allocation* alone — admits a
+parent that has sold 60 of 100 while a child holds 50: the child's seats are
+free by its own row, the parent's are committed, and together they exceed the
+partition. The parent's commitments and its children's carve-outs draw on the
+same physical seats, so both belong on the same side of the inequality.
+
+Invariant 5 exists because a child whose parent row is absent belongs to no
+physical partition at all, and is therefore capacity conjured from nothing.
+
+Invariants 6 and 7 make row identity unambiguous. Without 6, "the online row"
+is whichever the query returns first, and netting may be applied to one row
+while a second is offered un-netted. Without 7, an owner holding both a
+guaranteed and a flexible row has both netted out of the parent but only the
+first offered back, stranding the rest where no channel can reach it.
+
+Invariant 8 must never be checked by summing every row blindly, because
 parents and children overlap by design. It is verified through the netted
 model and the reconciliation queries.
 
@@ -201,6 +222,13 @@ belongs to.
   the row loses its free entitlement but retains `sold + held` as an effective
   carve-out. Returning committed seats to the parent would allow already-sold
   seats to be sold a second time.
+
+  The collapse applies to **every** requester, including the masked owner
+  itself. Exempting the owner's own row makes the netted tree differ by
+  requester: other channels see the child collapsed and the parent hands its
+  seats back, while the owner simultaneously still holds them. Each view is
+  internally consistent; together they double-count. Netting must therefore not
+  depend on who is asking — one tree, one answer, for everyone.
 
 ## 7. Lifecycle
 
