@@ -2072,8 +2072,10 @@ describe('CutoffService.apply', () => {
       'SELECT allocated_slots FROM channel_allocations WHERE id = $1',
       [ids.counter],
     );
-    // 10 existing + online (90-5=85) + flexible (20-3=17) = 112.
-    expect(rows[0].allocated_slots).toBe(112);
+    // online's NETTED free is 90 - 35 children - 5 sold = 50, not 85: the raw
+    // 85 includes seats its children already hold. Plus flexible's 17.
+    // 10 + 50 + 17 = 77.
+    expect(rows[0].allocated_slots).toBe(77);
   });
 
   it('is idempotent', async () => {
@@ -2084,17 +2086,32 @@ describe('CutoffService.apply', () => {
       'SELECT allocated_slots FROM channel_allocations WHERE id = $1',
       [ids.counter],
     );
-    expect(rows[0].allocated_slots).toBe(112);
+    expect(rows[0].allocated_slots).toBe(77);
   });
 
-  it('preserves sold seats on every row it drains', async () => {
+  it('shrinks the parent by what its child released', async () => {
     const { configId, ids } = await cutoffTree();
     await cutoff.apply(configId, 'test');
     const { rows } = await pool.query(
       'SELECT sold_slots, allocated_slots FROM channel_allocations WHERE id = $1',
       [ids.online],
     );
-    expect(rows[0]).toMatchObject({ sold_slots: 5, allocated_slots: 5 });
+    // 90 - 50 (own netted free) - 17 (returned by the flexible child) = 23,
+    // which is exactly children(3 + 15) + sold(5). Sold seats never move.
+    expect(rows[0]).toMatchObject({ sold_slots: 5, allocated_slots: 23 });
+  });
+
+  it('leaves the partition intact, so every invariant still holds', async () => {
+    const { configId, cabinCapacity } = await cutoffTreeWithCapacity();
+    await cutoff.apply(configId, 'test');
+    const rows = await loadEngineRows(pool, configId);
+    // The whole point of netting the release: cutoff rewrites more rows than
+    // any other operation, and must not be the thing that breaks the tree.
+    expect(checkInvariants(rows, cabinCapacity)).toEqual([]);
+    const directSum = rows
+      .filter((r) => r.allocationType === 'direct')
+      .reduce((t, r) => t + r.allocatedSlots, 0);
+    expect(directSum).toBe(cabinCapacity);
   });
 });
 ```
@@ -2156,7 +2173,31 @@ export class CutoffService {
         ctx.rows.find((r) => r.channel === 'counter' && r.allocationType === 'direct') ??
         (await this.createCounterRow(ctx.client, configId));
 
+      // Netted, not raw. A parent's raw free portion includes seats its children
+      // already hold; releasing that to counter hands the same seat to two
+      // places. `netAgainstChildren` is the same function the waterfall uses, so
+      // cutoff and availability can never disagree about what "free" means.
+      const onlineChildren = sumOnlineFundedChildren(ctx.rows);
+      const partnerChildren = sumPartnerFundedChildren(ctx.rows);
+      const nettedFree = (row: AllocationRow): number => {
+        if (row.channel === 'online' && row.allocationType === 'direct') {
+          return rawAvailable(netAgainstChildren(row, onlineChildren));
+        }
+        if (row.channel === 'partner_pool') {
+          return rawAvailable(netAgainstChildren(row, partnerChildren));
+        }
+        return rawAvailable(row);
+      };
+
+      const onlineParent = ctx.rows.find(
+        (r) => r.channel === 'online' && r.ownerId === null && r.allocationType === 'direct',
+      );
+      const poolRow = ctx.rows.find((r) => r.channel === 'partner_pool');
+
       let moved = 0;
+      let onlineGivenBack = 0;
+      let poolGivenBack = 0;
+
       for (const row of ctx.rows) {
         if (row.id === counter.id) continue;
         const eligible =
@@ -2165,11 +2206,20 @@ export class CutoffService {
             (row.channel === 'online' || row.channel === 'marketplace'));
         if (!eligible) continue;
 
-        const movable = row.allocatedSlots - row.soldSlots - row.heldSlots;
+        const movable = nettedFree(row);
         if (movable <= 0) continue;
 
         await ctx.applyDelta(row.id, { allocatedDelta: -movable });
         moved += movable;
+
+        // A child giving up capacity already returns that headroom to its
+        // funding parent. Crediting counter as well would count it twice, so
+        // the parent must shrink by the same amount. This is what keeps the
+        // sum of direct allocations equal to cabin capacity.
+        if (row.allocationType === 'flexible') {
+          if (row.fundingSource === 'partner_pool') poolGivenBack += movable;
+          else onlineGivenBack += movable;
+        }
         await this.ledger.record(ctx.client, {
           configId,
           allocationId: row.id,
@@ -2182,12 +2232,20 @@ export class CutoffService {
         });
       }
 
+      // The partner pool is itself a child of online, so headroom it returns
+      // must propagate up one more level.
+      if (poolRow && poolGivenBack > 0) {
+        await ctx.applyDelta(poolRow.id, { allocatedDelta: -poolGivenBack });
+        onlineGivenBack += poolGivenBack;
+      }
+      if (onlineParent && onlineGivenBack > 0) {
+        await ctx.applyDelta(onlineParent.id, { allocatedDelta: -onlineGivenBack });
+      }
+
       if (moved > 0) {
         await ctx.applyDelta(counter.id, { allocatedDelta: moved });
       }
 
-      // Set last: the deferred pool-ceiling trigger reads this flag at COMMIT,
-      // and after cutoff the parent is legitimately drained below its children.
       await ctx.client.query(
         'UPDATE allocation_configs SET cutoff_applied_at = now() WHERE id = $1',
         [configId],
