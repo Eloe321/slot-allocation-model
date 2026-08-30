@@ -6,8 +6,8 @@ Sequenced. Each plan produces working, testable software on its own.
 |---|---|---|
 | [01 — Pure engine](2026-08-30-01-pure-engine.md) | Workspace, domain types, netting, waterfall, consumption planning, invariants, property tests | **Complete** — 54 tests, plus a post-review correctness pass (see below) |
 | [02 — Persistence and API](2026-08-30-02-persistence-and-api.md) | Postgres schema, deferred constraint triggers, locking repository, holds, cutoff, ledger, concurrency proof, HTTP surface, scenario seeds | Written |
-| 03 — Inspector UI | Next.js tree, request panel, waterfall trace, ledger stream | Written at its phase boundary |
-| 04 — README and ADRs | The source-of-truth README, ten decision records | Written at its phase boundary |
+| [03 — Inspector UI](2026-08-30-03-inspector-ui.md) | Next.js tree, request panel, waterfall trace, ledger stream | **Complete** |
+| 04 — README and ADRs | The source-of-truth README, twelve decision records | **Complete** — written last so it could quote real output |
 
 ## Why 03 and 04 are written later
 
