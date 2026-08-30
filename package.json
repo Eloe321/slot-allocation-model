@@ -6,8 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "bootstrap": "pnpm install && pnpm build && pnpm db:migrate && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
     "build": "pnpm --filter @slot/engine build",
-    "setup": "pnpm install && pnpm build && pnpm db:migrate && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
     "dev": "pnpm --filter @slot/api dev",
     "test": "pnpm build && pnpm -r test",
     "typecheck": "pnpm -r typecheck",
