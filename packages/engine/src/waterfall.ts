@@ -57,9 +57,14 @@ export interface Candidate {
   step: WaterfallStep;
 }
 
+/** Why a step was skipped, in a form callers and tests can branch on. */
+export type SkipCode = 'no_owner_row' | 'counter_siloed' | 'pool_requires_managed';
+
 export interface SkippedCandidate {
   step: WaterfallStep;
   rowId: number | null;
+  code: SkipCode;
+  /** Human-readable gloss on `code`. The UI shows this; do not branch on it. */
   reason: string;
 }
 
@@ -117,13 +122,19 @@ export function selectCandidates(
       step: identity.kind === 'online' ? 'online_remainder' : 'primary',
     });
   } else if (identity.kind === 'owner') {
-    skipped.push({ step: 'primary', rowId: null, reason: 'owner has no dedicated row on this config' });
+    skipped.push({
+      step: 'primary',
+      rowId: null,
+      code: 'no_owner_row',
+      reason: 'owner has no dedicated row on this config',
+    });
   }
 
   if (identity.kind === 'counter') {
     skipped.push({
       step: 'online_remainder',
       rowId: online?.id ?? null,
+      code: 'counter_siloed',
       reason: 'counter is siloed and never falls back to another pool',
     });
     return { identity, candidates, skipped, freeForAll };
@@ -137,6 +148,7 @@ export function selectCandidates(
       skipped.push({
         step: 'partner_pool',
         rowId: pool.id,
+        code: 'pool_requires_managed',
         reason:
           identity.kind === 'owner'
             ? 'owner is not managed, so it is funded from online rather than the pool'

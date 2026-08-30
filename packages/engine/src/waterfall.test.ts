@@ -109,7 +109,7 @@ describe('selectCandidates', () => {
   it('gives counter its own row and nothing else', () => {
     const trace = selectCandidates(tree, { kind: 'counter' });
     expect(trace.candidates.map((c) => c.row.id)).toEqual([1]);
-    expect(trace.skipped.some((s) => s.reason.includes('siloed'))).toBe(true);
+    expect(trace.skipped.some((s) => s.code === 'counter_siloed')).toBe(true);
   });
 
   it('spills an ordinary owner into the netted online remainder', () => {

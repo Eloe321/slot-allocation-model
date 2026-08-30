@@ -21,6 +21,7 @@ export {
   selectPrimary,
   sumAvailable,
   type Candidate,
+  type SkipCode,
   type SkippedCandidate,
   type WaterfallStep,
   type WaterfallTrace,
