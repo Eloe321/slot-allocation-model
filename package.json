@@ -8,7 +8,7 @@
   "scripts": {
     "bootstrap": "pnpm install && pnpm build && pnpm db:migrate && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
     "build": "pnpm --filter @slot/engine build",
-    "dev": "pnpm --filter @slot/api dev",
+    "dev": "pnpm --parallel --filter @slot/api --filter @slot/web dev",
     "test": "pnpm build && pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "db:migrate": "pnpm --filter @slot/api db:migrate",

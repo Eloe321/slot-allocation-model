@@ -41,7 +41,7 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  await app.listen(Number(process.env.PORT ?? 3001));
+  await app.listen(Number(process.env.PORT ?? 4001));
 }
 
 void bootstrap();
