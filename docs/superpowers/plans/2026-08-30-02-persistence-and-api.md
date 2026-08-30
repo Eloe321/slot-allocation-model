@@ -1205,7 +1205,10 @@ afterAll(async () => {
   await pool.end();
 });
 
-async function tree(): Promise<{ configId: number; ids: Record<string, number> }> {
+// Return type is inferred deliberately: annotating `ids` as Record<string, number>
+// widens every property access to `number | undefined` under
+// noUncheckedIndexedAccess, which the strict identity types then reject.
+async function tree() {
   const { configId } = await seedConfig(pool, 100);
   const ordinary = await addOwner(pool, 'Agency Seven');
   const managedOwner = await addOwner(pool, 'Managed Nine');
