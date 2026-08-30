@@ -10,7 +10,7 @@ import {
 } from '@slot/engine';
 import { AllocationRepository } from '../allocation/allocation.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { InsufficientCapacityError } from './errors.js';
+import { InsufficientCapacityError, ReservationNotFoundError, ReservationNotOpenError } from './errors.js';
 
 export interface ReserveInput {
   configId: number;
@@ -98,5 +98,118 @@ export class ReservationService {
       })),
       identity,
     );
+  }
+
+  /**
+   * Confirm every split under `token` in one transaction: held decreases, sold
+   * increases, and a durable link records exactly which row each seat came from.
+   *
+   * The link — not the booking's declared channel — is what a later release
+   * reads, which is the only correct answer when the waterfall drew from
+   * several rows.
+   */
+  async confirm(
+    token: string,
+    bookingRef: string,
+    actor: string,
+  ): Promise<{ alreadyConfirmed: boolean; splits: Split[] }> {
+    const configId = await this.configIdForToken(token);
+    return this.repo.withLockedConfig(configId, async (ctx) => {
+      const holds = await ctx.client.query<{
+        id: string;
+        allocation_id: string;
+        quantity: number;
+        status: string;
+      }>(
+        `SELECT id, allocation_id, quantity, status FROM slot_holds
+          WHERE token = $1 ORDER BY id FOR UPDATE`,
+        [token],
+      );
+
+      if (holds.rows.every((h) => h.status === 'confirmed')) {
+        return {
+          alreadyConfirmed: true,
+          splits: holds.rows.map((h) => ({
+            rowId: Number(h.allocation_id),
+            step: 'primary' as const,
+            quantity: h.quantity,
+          })),
+        };
+      }
+
+      const notOpen = holds.rows.find((h) => h.status !== 'open');
+      if (notOpen) throw new ReservationNotOpenError(token, notOpen.status);
+
+      const splits: Split[] = [];
+      for (const hold of holds.rows) {
+        const allocationId = Number(hold.allocation_id);
+        await ctx.applyDelta(allocationId, {
+          heldDelta: -hold.quantity,
+          soldDelta: hold.quantity,
+        });
+        await ctx.client.query(`UPDATE slot_holds SET status = 'confirmed' WHERE id = $1`, [
+          hold.id,
+        ]);
+        await ctx.client.query(
+          `INSERT INTO booking_slot_links (booking_ref, config_id, allocation_id, quantity)
+           VALUES ($1,$2,$3,$4)`,
+          [bookingRef, configId, allocationId, hold.quantity],
+        );
+        await this.ledger.record(ctx.client, {
+          configId,
+          allocationId,
+          eventType: 'confirm_sale',
+          quantity: hold.quantity,
+          actor,
+          token,
+          reason: `booking ${bookingRef}`,
+        });
+        splits.push({ rowId: allocationId, step: 'primary', quantity: hold.quantity });
+      }
+      return { alreadyConfirmed: false, splits };
+    });
+  }
+
+  /** Return an open hold's seats to the exact rows they were taken from. */
+  async release(token: string, actor: string): Promise<void> {
+    const configId = await this.configIdForToken(token);
+    await this.repo.withLockedConfig(configId, async (ctx) => {
+      const holds = await ctx.client.query<{
+        id: string;
+        allocation_id: string;
+        quantity: number;
+        status: string;
+      }>(
+        `SELECT id, allocation_id, quantity, status FROM slot_holds
+          WHERE token = $1 ORDER BY id FOR UPDATE`,
+        [token],
+      );
+
+      const notOpen = holds.rows.find((h) => h.status !== 'open');
+      if (notOpen) throw new ReservationNotOpenError(token, notOpen.status);
+
+      for (const hold of holds.rows) {
+        const allocationId = Number(hold.allocation_id);
+        await ctx.applyDelta(allocationId, { heldDelta: -hold.quantity });
+        await ctx.client.query(`UPDATE slot_holds SET status = 'released' WHERE id = $1`, [hold.id]);
+        await this.ledger.record(ctx.client, {
+          configId,
+          allocationId,
+          eventType: 'release_hold',
+          quantity: hold.quantity,
+          actor,
+          token,
+        });
+      }
+    });
+  }
+
+  private async configIdForToken(token: string): Promise<number> {
+    const { rows } = await this.pool.query<{ config_id: string }>(
+      'SELECT config_id FROM slot_holds WHERE token = $1 LIMIT 1',
+      [token],
+    );
+    if (rows.length === 0) throw new ReservationNotFoundError(token);
+    return Number(rows[0]!.config_id);
   }
 }
