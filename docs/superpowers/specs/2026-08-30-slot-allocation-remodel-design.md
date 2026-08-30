@@ -255,16 +255,40 @@ drawn from two or three different rows.
 
 ### Cutoff
 
-At the voyage booking cutoff, for each eligible row:
+At the voyage booking cutoff, unsold capacity that channels no longer need is
+consolidated onto `counter`. `flexible` children and direct `online` /
+`marketplace` rows give up their free portion; `guaranteed` children keep
+theirs. Sold and held seats never move.
+
+**Cutoff must preserve the partition.** Two rules make it do so:
 
 ```
-movable = allocated - sold - held
+movable(r) = allocated - own_children - sold - held     (netted, not raw)
+
+when a child releases X:  child.allocated          -= X
+                          funding_parent.allocated -= X
+                          counter.allocated        += X
 ```
 
-Movable capacity on `flexible` rows and on direct `online` / `marketplace`
-rows transfers to `counter`. `guaranteed` rows are untouched. `counter`
-remains `counter`. A `cutoff_applied_at` timestamp makes the sweep idempotent,
-and every movement is recorded in the ledger.
+The netting matters because a parent's raw free portion includes seats its
+children already hold; releasing that to `counter` hands the same seat to two
+places. The parent decrement matters because a child giving up capacity already
+returns that headroom to its parent - crediting `counter` as well counts it
+twice. Together these errors are large: on a 100-seat cabin with a 90-seat
+online parent (5 sold), a 20-seat flexible child (3 sold) and a 15-seat
+guaranteed child (2 sold), the naive `allocated - sold - held` form yields 135
+reachable seats.
+
+A useful consequence: because every release decrements a parent by exactly what
+it credits to `counter`, the sum of direct allocations stays equal to cabin
+capacity, and each parent lands exactly on its ceiling
+(`allocated = children + sold + held`). Post-cutoff state therefore satisfies
+every invariant in section 5 unchanged, and the database constraints need **no
+cutoff exemption** - layer three stays armed at all times, including during the
+one operation that rewrites the most rows.
+
+A `cutoff_applied_at` timestamp makes the sweep idempotent, and every movement
+is recorded in the ledger.
 
 ### Ledger
 
