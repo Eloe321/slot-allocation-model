@@ -2274,7 +2274,7 @@ export class CutoffService {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `pnpm --filter @slot/api test src/cutoff`
-Expected: PASS — 5 tests.
+Expected: PASS — 6 tests.
 
 - [ ] **Step 5: Commit**
 

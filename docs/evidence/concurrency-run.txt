@@ -1,14 +1,16 @@
 
 > @slot/api@0.1.0 test /Users/geloes/Slot-Allocation-Remodel/apps/api
-> vitest run src/reservation/oversell.concurrency.test.ts
+> vitest run src/reservation/oversell.concurrency.test.ts --reporter=verbose
 
 
  RUN  v3.2.7 /Users/geloes/Slot-Allocation-Remodel/apps/api
 
- ✓ src/reservation/oversell.concurrency.test.ts (3 tests) 630ms
+ ✓ src/reservation/oversell.concurrency.test.ts > oversell under concurrency > grants exactly the available seats when 50 requests race for 10 1175ms
+ ✓ src/reservation/oversell.concurrency.test.ts > oversell under concurrency > keeps the ledger consistent with the counters under contention 1306ms
+ ✓ src/reservation/oversell.concurrency.test.ts > oversell under concurrency > does not oversell when concurrent requests split across the tree 987ms
 
  Test Files  1 passed (1)
       Tests  3 passed (3)
-   Start at  17:14:49
-   Duration  1.48s (transform 153ms, setup 0ms, collect 471ms, tests 630ms, environment 0ms, prepare 135ms)
+   Start at  17:16:46
+   Duration  4.87s (transform 200ms, setup 0ms, collect 664ms, tests 3.56s, environment 0ms, prepare 141ms)
 
