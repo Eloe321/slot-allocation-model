@@ -332,3 +332,11 @@ td[data-diverges] { color: var(--primary); font-weight: 600; }
   font-size: var(--text-sm);
   color: var(--ink);
 }
+
+.sold-note {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--surface);
+  border-left: 1px solid var(--cap-sold);
+  font-size: var(--text-sm);
+}

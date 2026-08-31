@@ -48,6 +48,12 @@ export interface Reservation {
   trace: Trace;
 }
 
+export interface Confirmation {
+  /** True when every row under the token was already confirmed (idempotent replay). */
+  alreadyConfirmed: boolean;
+  splits: Split[];
+}
+
 export interface Shortfall {
   error: 'insufficient_capacity';
   requested: number;

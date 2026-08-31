@@ -1,5 +1,5 @@
 import type {
-  Identity, LedgerEntry, Reservation, Scenario, Shortfall, Trace, Tree,
+  Confirmation, Identity, LedgerEntry, Reservation, Scenario, Shortfall, Trace, Tree,
 } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001';
@@ -31,6 +31,11 @@ export const api = {
     json<Reservation>(`/configs/${configId}/reservations`, {
       method: 'POST',
       body: JSON.stringify({ ...identity, quantity }),
+    }),
+  confirm: (token: string, bookingRef: string) =>
+    json<Confirmation>(`/reservations/${token}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ bookingRef }),
     }),
   release: (token: string) =>
     json<{ ok: true }>(`/reservations/${token}/release`, { method: 'POST' }),

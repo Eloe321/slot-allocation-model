@@ -18,6 +18,9 @@ export default function Page() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [trace, setTrace] = useState<Trace | null>(null);
   const [reservation, setReservation] = useState<Reservation | null>(null);
+  // A confirmed sale is terminal: the token can no longer be released, so this
+  // replaces the held reservation rather than sitting alongside it.
+  const [sale, setSale] = useState<{ bookingRef: string; seats: number } | null>(null);
   const [shortfall, setShortfall] = useState<Reservation extends never ? never : {
     requested: number; available: number; shortfall: number;
   } | null>(null);
@@ -58,6 +61,14 @@ export default function Page() {
   // discovering it only from a 409.
   useEffect(() => {
     if (!tree) return;
+    // An owned channel with no owner selected is a deliberate hard-fail on the
+    // server. Don't ask: it would 400 every time and log a console error that
+    // looks like a defect rather than the guard working.
+    const needsOwner = request.channel === 'agency' || request.channel === 'reseller';
+    if (needsOwner && request.ownerId === null) {
+      setAvailable(null);
+      return;
+    }
     let cancelled = false;
     const id = {
       channel: request.channel,
@@ -110,6 +121,7 @@ export default function Page() {
       setConfigId(id);
       setTrace(null);
       setReservation(null);
+      setSale(null);
       setShortfall(null);
       setRequest(INITIAL);
     });
@@ -168,6 +180,7 @@ export default function Page() {
                 run(async () => {
                   setShortfall(null);
                   const r = await api.reserve(tree.configId, identity(), request.quantity);
+                  setSale(null);
                   setReservation(r);
                   setTrace(r.trace);
                   await refresh(tree.configId);
@@ -181,10 +194,25 @@ export default function Page() {
                   await refresh(tree.configId);
                 })
               }
+              sale={sale}
+              onConfirm={() =>
+                run(async () => {
+                  if (!reservation) return;
+                  const bookingRef = `BK-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+                  const result = await api.confirm(reservation.token, bookingRef);
+                  const seats = result.splits.reduce((t, sp) => t + sp.quantity, 0);
+                  // Confirmed tokens cannot be released, so drop the held
+                  // reservation and show the sale in its place.
+                  setReservation(null);
+                  setSale({ bookingRef, seats });
+                  await refresh(tree.configId);
+                })
+              }
               onCutoff={() =>
                 run(async () => {
                   await api.cutoff(tree.configId);
                   setReservation(null);
+                  setSale(null);
                   setTrace(null);
                   await refresh(tree.configId);
                 })

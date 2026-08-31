@@ -19,8 +19,10 @@ export function RequestPanel({
   onPreview,
   onReserve,
   onRelease,
+  onConfirm,
   onCutoff,
   reservation,
+  sale,
   shortfall,
   busy,
 }: {
@@ -32,8 +34,11 @@ export function RequestPanel({
   onPreview: () => void;
   onReserve: () => void;
   onRelease: () => void;
+  onConfirm: () => void;
   onCutoff: () => void;
   reservation: Reservation | null;
+  /** A completed sale. Terminal — the token can no longer be released. */
+  sale: { bookingRef: string; seats: number } | null;
   shortfall: { requested: number; available: number; shortfall: number } | null;
   busy: boolean;
 }) {
@@ -141,6 +146,11 @@ export function RequestPanel({
         <button onClick={onPreview} disabled={busy}>Preview</button>
         <button data-variant="primary" onClick={onReserve} disabled={busy}>Reserve</button>
         {reservation ? (
+          <button data-variant="primary" onClick={onConfirm} disabled={busy}>
+            Confirm sale
+          </button>
+        ) : null}
+        {reservation ? (
           <button onClick={onRelease} disabled={busy}>Release</button>
         ) : null}
         <button onClick={onCutoff} disabled={busy} className="push">Apply cutoff</button>
@@ -151,6 +161,14 @@ export function RequestPanel({
           Refused. Asked for <span className="num">{shortfall.requested}</span>,{' '}
           <span className="num">{shortfall.available}</span> reachable — short by{' '}
           <span className="num">{shortfall.shortfall}</span>.
+        </p>
+      ) : null}
+
+      {sale ? (
+        <p className="sold-note">
+          Sold <span className="num">{sale.seats}</span> as{' '}
+          <span className="num">{sale.bookingRef}</span>. Each split now has a durable
+          link recording the exact row its seats came from.
         </p>
       ) : null}
 
