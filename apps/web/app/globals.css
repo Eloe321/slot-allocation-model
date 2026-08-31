@@ -320,3 +320,15 @@ td[data-diverges] { color: var(--primary); font-weight: 600; }
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* --- seats ceiling + pre-submit refusal warning ------------------------- */
+.ceiling { color: var(--ink-muted); font-weight: 400; }
+
+.will-refuse {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--surface);
+  border-left: 1px solid var(--cap-held);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}

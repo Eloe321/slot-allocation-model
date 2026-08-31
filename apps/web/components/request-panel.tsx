@@ -15,6 +15,7 @@ export function RequestPanel({
   tree,
   state,
   onChange,
+  available,
   onPreview,
   onReserve,
   onRelease,
@@ -26,6 +27,8 @@ export function RequestPanel({
   tree: Tree;
   state: RequestState;
   onChange: (next: RequestState) => void;
+  /** Seats the current identity can reach; null when it cannot be determined. */
+  available: number | null;
   onPreview: () => void;
   onReserve: () => void;
   onRelease: () => void;
@@ -98,15 +101,41 @@ export function RequestPanel({
         ) : null}
 
         <label>
-          <span>seats</span>
+          <span>
+            seats
+            {available !== null ? (
+              <span className="ceiling">
+                {' '}· <span className="num">{available}</span> reachable
+              </span>
+            ) : null}
+          </span>
           <input
             type="number"
             min={1}
+            // Bounded by the cabin, not by what this identity can reach.
+            // Capping at `available` would make it impossible to demonstrate a
+            // refusal, and refusals are a documented behaviour of the waterfall
+            // (the siloed counter scenario exists precisely to show one).
+            // This stops nonsense like 9999 without hiding the interesting case.
+            max={tree.cabinCapacity}
             value={state.quantity}
-            onChange={(e) => onChange({ ...state, quantity: Number(e.target.value) })}
+            onChange={(e) => {
+              const raw = Number(e.target.value);
+              if (Number.isNaN(raw)) return;
+              const clamped = Math.min(Math.max(1, Math.trunc(raw)), tree.cabinCapacity);
+              onChange({ ...state, quantity: clamped });
+            }}
           />
         </label>
       </div>
+
+      {available !== null && state.quantity > available ? (
+        <p className="will-refuse">
+          <span className="num">{state.quantity}</span> exceeds the{' '}
+          <span className="num">{available}</span> this identity can reach — reserving
+          will be refused, with the shortfall.
+        </p>
+      ) : null}
 
       <div className="actions">
         <button onClick={onPreview} disabled={busy}>Preview</button>

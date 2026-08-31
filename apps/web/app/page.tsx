@@ -22,6 +22,9 @@ export default function Page() {
     requested: number; available: number; shortfall: number;
   } | null>(null);
   const [request, setRequest] = useState<RequestState>(INITIAL);
+  // What the CURRENT identity can actually reach, kept live by the preview
+  // effect below so the seats field always knows its own ceiling.
+  const [available, setAvailable] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,33 @@ export default function Page() {
   useEffect(() => {
     if (configId !== null) void refresh(configId).catch((e: Error) => setError(e.message));
   }, [configId, refresh]);
+
+  // Keep the reachable count current for whatever identity is selected. This is
+  // the read-only preview endpoint, so it changes nothing; it exists so the
+  // seats field can show and bound its own ceiling instead of the user
+  // discovering it only from a 409.
+  useEffect(() => {
+    if (!tree) return;
+    let cancelled = false;
+    const id = {
+      channel: request.channel,
+      ...(request.ownerId !== null ? { ownerId: request.ownerId } : {}),
+      ...(request.managed ? { managed: true } : {}),
+    };
+    api
+      .waterfall(tree.configId, id)
+      .then((t) => {
+        if (!cancelled) setAvailable(typeof t.available === 'number' ? t.available : null);
+      })
+      .catch(() => {
+        // An unresolved owner legitimately 400s here; the field just loses its
+        // ceiling hint rather than surfacing an error the user did not ask for.
+        if (!cancelled) setAvailable(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tree, request.channel, request.ownerId, request.managed]);
 
   const identity = () => ({
     channel: request.channel,
@@ -124,6 +154,7 @@ export default function Page() {
               tree={tree}
               state={request}
               onChange={setRequest}
+              available={available}
               busy={busy}
               reservation={reservation}
               shortfall={shortfall}
