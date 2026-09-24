@@ -10,7 +10,6 @@ services:
       - "55432:5432"
     volumes:
       - slot_pgdata:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U slot -d slot_allocation"]
       interval: 2s

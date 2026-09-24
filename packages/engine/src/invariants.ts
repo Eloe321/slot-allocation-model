@@ -15,6 +15,7 @@ export type ViolationCode =
   | 'online_child_without_parent'
   | 'partner_child_without_pool'
   | 'duplicate_online_parent'
+  | 'duplicate_direct_channel'
   | 'duplicate_partner_pool'
   | 'duplicate_owner_row';
 
@@ -102,6 +103,17 @@ export function checkInvariants(rows: AllocationRow[], cabinCapacity: number): V
  */
 function checkStructure(rows: AllocationRow[]): Violation[] {
   const violations: Violation[] = [];
+
+  for (const channel of ['counter', 'marketplace'] as const) {
+    const direct = rows.filter((r) => r.channel === channel && r.allocationType === 'direct');
+    if (direct.length > 1) {
+      violations.push({
+        code: 'duplicate_direct_channel',
+        rowId: null,
+        detail: `${direct.length} ${channel} direct rows; expected at most one`,
+      });
+    }
+  }
 
   const onlineChildren = rows.filter((r) => isChild(r) && r.fundingSource !== 'partner_pool');
   if (onlineChildren.length > 0 && !findOnlineDirectRow(rows)) {

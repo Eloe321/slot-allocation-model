@@ -4,7 +4,14 @@ export const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://slot:slot@localhost:55432/slot_allocation';
 
 export function createPool(): Pool {
-  return new Pool({ connectionString: DATABASE_URL, max: 20 });
+  return new Pool({
+    connectionString: DATABASE_URL,
+    max: 20,
+    // A hosted service needs a bounded failure here. Otherwise an unreachable
+    // database leaves the migration process waiting while the platform reports
+    // only that no HTTP port was opened.
+    connectionTimeoutMillis: 10_000,
+  });
 }
 
 /**

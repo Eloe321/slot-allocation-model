@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.next
+.env
+.env.*
+!.env.example
+.playwright-mcp
+docs/images

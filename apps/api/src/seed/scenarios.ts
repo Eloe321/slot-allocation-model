@@ -1,4 +1,5 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
+import { visibleOwnerId } from '../db/owner-identity.js';
 
 export interface ScenarioRow {
   channel: 'counter' | 'online' | 'marketplace' | 'partner_pool' | 'agency' | 'reseller';
@@ -154,10 +155,21 @@ export function listScenarios(): ScenarioSummary[] {
 export async function applyScenario(pool: Pool, key: string): Promise<AppliedScenario> {
   const scenario = SCENARIOS.find((s) => s.key === key);
   if (!scenario) throw new Error(`unknown scenario: ${key}`);
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const result = await insertScenario(client, scenario);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function insertScenario(client: PoolClient, scenario: Scenario): Promise<AppliedScenario> {
     const { rows: cfg } = await client.query<{ id: string }>(
       `WITH v AS (INSERT INTO vessels (name) VALUES ($2) RETURNING id),
             c AS (INSERT INTO cabins (vessel_id, name, capacity)
@@ -165,20 +177,23 @@ export async function applyScenario(pool: Pool, key: string): Promise<AppliedSce
             t AS (INSERT INTO voyages (vessel_id, departure_port, departs_at, booking_cutoff_at)
                   SELECT vessel_id, 'Port Aurora', now() + interval '2 days',
                          now() + interval '1 day' FROM c RETURNING id)
-       INSERT INTO allocation_configs (voyage_id, cabin_id, cabin_capacity)
-       SELECT t.id, c.id, $1 FROM t, c RETURNING id`,
-      [scenario.cabinCapacity, `MV ${scenario.title}`],
+       INSERT INTO allocation_configs (voyage_id, cabin_id, cabin_capacity, scenario_key)
+       SELECT t.id, c.id, $1, $3 FROM t, c RETURNING id`,
+      [scenario.cabinCapacity, `MV ${scenario.title}`, scenario.key],
     );
     const configId = Number(cfg[0]!.id);
 
     for (const row of scenario.rows) {
       let ownerId: number | null = null;
       if (row.owner) {
-        const { rows: o } = await client.query<{ id: string }>(
-          'INSERT INTO owners (name, is_hidden) VALUES ($1,$2) RETURNING id',
-          [row.owner.name, row.owner.hidden ?? false],
-        );
-        ownerId = Number(o[0]!.id);
+        if (row.owner.hidden) {
+          const { rows: o } = await client.query<{ id: string }>(
+            'INSERT INTO owners (name, is_hidden) VALUES ($1,true) RETURNING id', [row.owner.name],
+          );
+          ownerId = Number(o[0]!.id);
+        } else {
+          ownerId = await visibleOwnerId(client, row.owner.name);
+        }
       }
       await client.query(
         `INSERT INTO channel_allocations
@@ -203,14 +218,7 @@ export async function applyScenario(pool: Pool, key: string): Promise<AppliedSce
        VALUES ($1,'config_init',0,'seed',$2)`,
       [configId, scenario.teaches],
     );
-    await client.query('COMMIT');
     return { configId, cabinCapacity: scenario.cabinCapacity };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
 }
 
 /**
@@ -223,6 +231,35 @@ export async function applyScenario(pool: Pool, key: string): Promise<AppliedSce
 export async function resetScenario(pool: Pool, key: string): Promise<AppliedScenario> {
   const scenario = SCENARIOS.find((s) => s.key === key);
   if (!scenario) throw new Error(`unknown scenario: ${key}`);
-  await pool.query('DELETE FROM vessels WHERE name = $1', [`MV ${scenario.title}`]);
-  return applyScenario(pool, key);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const formerOwners = await client.query<{ id: string }>(
+    `SELECT DISTINCT o.id FROM owners o
+       JOIN channel_allocations a ON a.owner_id = o.id
+       JOIN allocation_configs c ON c.id = a.config_id
+       JOIN voyages t ON t.id = c.voyage_id
+      WHERE c.scenario_key = $1`, [key],
+  );
+    await client.query(
+      `DELETE FROM vessels v WHERE EXISTS (
+         SELECT 1 FROM voyages t JOIN allocation_configs c ON c.voyage_id = t.id
+          WHERE t.vessel_id = v.id AND c.scenario_key = $1)`, [key],
+    );
+    if (formerOwners.rows.length > 0) {
+      await client.query(
+      `DELETE FROM owners o WHERE o.id = ANY($1::bigint[])
+         AND NOT EXISTS (SELECT 1 FROM channel_allocations a WHERE a.owner_id = o.id)`,
+      [formerOwners.rows.map((row) => row.id)],
+      );
+    }
+    const result = await insertScenario(client, scenario);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

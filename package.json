@@ -6,15 +6,22 @@
     "node": ">=22"
   },
   "scripts": {
-    "bootstrap": "pnpm install && pnpm build && pnpm db:migrate && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
+    "bootstrap": "pnpm install --frozen-lockfile && pnpm --filter @slot/api db:ensure && pnpm build && pnpm db:migrate && pnpm db:provision:test && pnpm db:migrate:test && pnpm --filter @slot/api db:seed",
     "build": "pnpm --filter @slot/engine build",
     "dev": "pnpm --parallel --filter @slot/api --filter @slot/web dev",
     "test": "pnpm build && pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm build && pnpm -r typecheck",
+    "verify": "pnpm --filter @slot/api db:ensure && pnpm db:provision:test && pnpm db:migrate:test && pnpm lint && pnpm typecheck && pnpm test && pnpm --filter @slot/api build && pnpm --filter @slot/web build",
+    "lint": "eslint .",
     "db:migrate": "pnpm --filter @slot/api db:migrate",
-    "db:migrate:test": "DATABASE_URL=postgres://slot:slot@localhost:55432/slot_allocation_test pnpm --filter @slot/api db:migrate"
+    "db:provision:test": "pnpm --filter @slot/api db:provision:test",
+    "db:migrate:test": "pnpm --filter @slot/api db:migrate:test"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "15.5.24",
+    "eslint": "^9.39.5",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.70.1"
   }
 }

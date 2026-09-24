@@ -6,8 +6,13 @@ export function testPool(): Pool {
 }
 
 export async function resetDatabase(pool: Pool): Promise<void> {
+  const { rows } = await pool.query<{ database_name: string }>('SELECT current_database() AS database_name');
+  const name = rows[0]?.database_name;
+  if (!name || !/^[a-z][a-z0-9_]*_test$/.test(name)) {
+    throw new Error(`Refusing to reset non-test database: ${name ?? 'unknown'}`);
+  }
   await pool.query(`
-    TRUNCATE slot_movements, booking_slot_links, slot_holds,
+    TRUNCATE crm_webhook_attempts, crm_webhook_deliveries, reservation_refusals, demo_sessions, configuration_requests, slot_movements, booking_slot_links, slot_holds,
              channel_allocations, allocation_configs, voyages, cabins, vessels, owners
     RESTART IDENTITY CASCADE
   `);

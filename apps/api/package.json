@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
+    "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/seed/run.ts"
+    "db:ensure": "tsx src/db/ensure-db.ts",
+    "db:migrate:test": "tsx src/db/migrate-test.ts",
+    "db:provision:test": "tsx src/db/provision-test.ts",
+    "db:seed": "tsx src/seed/run.ts",
+    "db:seed:if-empty": "tsx src/seed/run.ts --if-empty"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

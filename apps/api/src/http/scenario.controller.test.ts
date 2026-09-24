@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import type { Pool } from 'pg';
 import { listScenarios, resetScenario } from '../seed/scenarios.js';
-import { testPool, resetDatabase } from '../db/test-helpers.js';
+import { testPool, resetDatabase, seedConfig } from '../db/test-helpers.js';
 
 let pool: Pool;
 beforeAll(() => { pool = testPool(); });
@@ -42,5 +42,17 @@ describe('scenario catalogue', () => {
 
   it('rejects an unknown scenario key', async () => {
     await expect(resetScenario(pool, 'nope')).rejects.toThrow('unknown scenario');
+  });
+
+  it('preserves a manager-created vessel that happens to share a seeded name', async () => {
+    const custom = await seedConfig(pool, 20);
+    await pool.query(
+      `UPDATE vessels SET name = 'MV The double-count trap'
+        WHERE id = (SELECT v.id FROM vessels v JOIN voyages t ON t.vessel_id = v.id
+          JOIN allocation_configs c ON c.voyage_id = t.id WHERE c.id = $1)`, [custom.configId],
+    );
+    await resetScenario(pool, 'double-count-trap');
+    const { rowCount } = await pool.query('SELECT 1 FROM allocation_configs WHERE id = $1', [custom.configId]);
+    expect(rowCount).toBe(1);
   });
 });

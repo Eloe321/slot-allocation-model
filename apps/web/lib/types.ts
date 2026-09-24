@@ -85,3 +85,101 @@ export interface Identity {
   ownerId?: number;
   managed?: boolean;
 }
+
+export type DemoRole = 'administrator' | 'operator' | 'partner';
+export interface DemoIdentity { role: DemoRole; label: string; ownerId: number | null }
+
+export interface ConfigurationRowInput {
+  channel: Channel;
+  allocationType: AllocationType;
+  fundingSource: FundingSource;
+  allocatedSlots: number;
+  ownerName: string | null;
+}
+
+export interface ConfigurationInput {
+  vesselName: string;
+  cabinName: string;
+  departurePort: string;
+  departsAt: string;
+  bookingCutoffAt: string;
+  capacity: number;
+  rows: ConfigurationRowInput[];
+}
+
+export interface ConfigurationPreview {
+  input: ConfigurationInput;
+  violations: Violation[];
+  directAllocated: number;
+  unallocated: number;
+  rows: (ConfigurationRowInput & { rawAvailable: number; nettedAvailable: number })[];
+}
+
+export interface ConfigurationRequest {
+  id: number;
+  status: 'submitted' | 'approved' | 'rejected';
+  proposed: ConfigurationInput;
+  submittedBy: string;
+  reviewedBy: string | null;
+  reviewReason: string | null;
+  configId: number | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface PartnerInventory {
+  allocationId: number;
+  configId: number;
+  channel: Channel;
+  allocationType: AllocationType;
+  allocatedSlots: number;
+  heldSlots: number;
+  soldSlots: number;
+  availableSlots: number;
+  ownerName: string;
+  vesselName: string;
+  departurePort: string;
+  departsAt: string;
+}
+
+export interface PartnerActivity {
+  id: number;
+  configId: number;
+  eventType: string;
+  quantity: number;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface InventoryReport {
+  configId: number;
+  physicalCapacity: number;
+  sellableNow: number;
+  heldSeats: number;
+  holdsDueSoon: number;
+  confirmedSales: number;
+  releasedSeats: number;
+  cutoffReturnedSeats: number;
+  preventedOversellAttempts: number;
+  channels: {
+    channel: Channel;
+    ownerName: string | null;
+    allocationType: AllocationType;
+    allocatedSeats: number;
+    sellableNow: number;
+    heldSeats: number;
+    soldSeats: number;
+  }[];
+}
+
+export interface CrmDelivery {
+  id: number;
+  eventKey: string;
+  eventType: string;
+  status: 'pending' | 'sending' | 'delivered' | 'failed';
+  attempts: number;
+  lastHttpStatus: number | null;
+  lastError: string | null;
+  nextAttemptAt: string;
+  deliveredAt: string | null;
+}

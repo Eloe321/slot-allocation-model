@@ -1,10 +1,14 @@
 # Slot Allocation
 
+[![Verify](https://github.com/Eloe321/slot-allocation-model/actions/workflows/verify.yml/badge.svg)](https://github.com/Eloe321/slot-allocation-model/actions/workflows/verify.yml)
+
 A capacity-allocation engine for a ferry booking platform: a trip's seats are
 partitioned among sales channels — walk-up counter, online, marketplace,
 agencies, resellers — with one hard physical ceiling that must never be breached,
 under concurrent load, across a booking lifecycle of holds, sales, refunds and
 cutoff.
+
+**I build booking and capacity-allocation systems that prevent overselling across direct, partner, and reseller channels.** This repository includes a manager workflow, a guided booking demo, role-specific views, an inventory report, and a signed CRM webhook outbox. See the [case study](docs/CASE_STUDY.md), [API guide](docs/API.md), and [walkthrough outline](docs/WALKTHROUGH.md).
 
 This is a rebuild. The original is production software I wrote inside a
 proprietary multi-tenant platform (~20k lines) and cannot publish. This
@@ -77,30 +81,41 @@ Everything below exists to prevent that.
 
 ## 2. Quickstart
 
-Requires Docker and Node 22+.
+Requires Docker, Node 24.10.0 (see `.nvmrc`), and pnpm 10.20.0.
 
 ```bash
-docker compose up -d      # PostgreSQL 16 on :55432
-pnpm bootstrap            # install, build, migrate, seed the scenarios
+pnpm bootstrap            # install, start PostgreSQL, migrate, seed the scenarios
 pnpm dev                  # API on :4001, inspector on :3000
 ```
 
-Then open <http://localhost:3000> (if 3000 is busy the inspector
-prints the port it chose). Six scenarios are seeded, each demonstrating
-exactly one rule. Selecting one rebuilds it from scratch, so the inspector is
-safe to poke at.
+Then open <http://localhost:3000> (if 3000 is busy the app prints the port it
+chose). Select the operator, administrator, or partner demo role. Six seeded
+scenarios each demonstrate one rule. “Reset current scenario” rebuilds the
+selected seed without affecting other configurations.
 
 ```bash
-pnpm test                 # 113 tests: 54 engine, 59 against real Postgres
-pnpm typecheck
+pnpm verify               # starts PostgreSQL, provisions the test DB, migrates,
+                          # lints, typechecks, tests, and builds both apps
 ```
 
 Port 55432 rather than 5432 so this cannot collide with a PostgreSQL you already
 run. The API accepts any `localhost` origin, so a busy port 3000 is not fatal.
 
-Tests run against a **separate database** (`slot_allocation_test`, created
-automatically) so that `pnpm test` cannot wipe the scenarios `pnpm bootstrap`
-just seeded.
+Tests run against a **separate database** (`slot_allocation_test`, provisioned
+explicitly by `pnpm bootstrap` and `pnpm verify`) so they cannot wipe the
+scenarios in the demo database. The database is created through PostgreSQL,
+without a bind-mounted init file; provisioning and migrations can be rerun.
+GitHub Actions runs the same `pnpm verify` command on pushes and pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the individual checks.
+
+The role chooser is deliberately public and uses no real customer data. Custom
+demo proposals and their approved sailings expire after 24 hours, with a cap of
+100 proposals and 500 active sessions. To send
+confirmed bookings to a CRM, configure `CRM_WEBHOOK_URL` and
+`CRM_WEBHOOK_SECRET` on the API; see the [signature and retry contract](docs/API.md#crm-booking-confirmation-webhook).
+
+A [disposable Docker deployment](docs/DEPLOYMENT.md) is included. A public URL
+and recorded walkthrough will be added after a host and domain are selected.
 
 ---
 
@@ -370,7 +385,8 @@ questions and both matter during an incident.
 
 ## 9. Testing
 
-**116 tests.** 56 in the engine with no database; 60 against real PostgreSQL.
+The suite covers the pure engine and real PostgreSQL, including configuration
+approval, role boundaries, reporting, and webhook delivery.
 
 - **Unit** — the engine's rules, in isolation.
 - **Property-based** — fast-check over generated trees. Two complementary
@@ -428,7 +444,7 @@ has a record saying what including it would have demonstrated.
 | **Cargo / lane metres** | The passenger path with `numeric(10,3)` instead of `int`. Doubles the code, adds no idea. The honest way to show the generalization is to make the engine generic over the unit, not to copy it. ([0007](docs/decisions/0007-no-cargo-track.md)) |
 | **Templates, versions, snapshots** | Version pinning is a good idea, but it is CRUD plus a foreign key sitting *upstream* of the allocation problem. ([0008](docs/decisions/0008-no-templates.md)) |
 | **Multi-tenancy, identity federation** | Deployment topology of the original system, not part of the allocation problem. |
-| **Payments, auth, real booking flow** | Everything here stops at the allocation boundary on purpose. |
+| **Payments and customer accounts** | The demo has selectable roles and an allocation-level booking lifecycle, without personal data or financial transactions. Production authentication is separate work. |
 
 Also honest about the limits of the proofs. The oversell and reachability
 properties together pin the drained total to exactly the allocated partition,
@@ -458,9 +474,9 @@ rebuilds it from scratch.
 
 ```
 packages/engine/     575 lines, zero I/O — netting, waterfall, planning, invariants
-apps/api/            NestJS: locking shell, holds, cutoff, ledger, HTTP
+apps/api/            NestJS: locking shell, holds, approvals, cutoff, ledger, report, webhook outbox, HTTP
   drizzle/migrations hand-written SQL: constraints, deferred triggers, indexes
-apps/web/            Next.js inspector
+apps/web/            Next.js manager, operator, and partner demo
 docs/decisions/      13 ADRs
 docs/evidence/       real test output quoted above
 ```

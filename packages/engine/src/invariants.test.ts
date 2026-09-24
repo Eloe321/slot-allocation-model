@@ -101,6 +101,14 @@ describe('checkInvariants', () => {
     });
   });
 
+  it.each(['counter', 'marketplace'] as const)('flags duplicate %s direct rows', (channel) => {
+    const rows = [row({ id: 1, channel, allocatedSlots: 10 }), row({ id: 2, channel, allocatedSlots: 10 })];
+    expect(checkInvariants(rows, 20)).toContainEqual({
+      code: 'duplicate_direct_channel', rowId: null,
+      detail: `2 ${channel} direct rows; expected at most one`,
+    });
+  });
+
   it('flags more than one partner pool row', () => {
     const rows = [
       row({ id: 1, channel: 'online', allocatedSlots: 60 }),

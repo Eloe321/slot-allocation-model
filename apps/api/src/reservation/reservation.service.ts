@@ -43,12 +43,20 @@ export class ReservationService {
    * method only persists that decision inside the locked transaction.
    */
   async reserve(input: ReserveInput): Promise<ReserveResult> {
-    return this.repo.withLockedConfig(input.configId, async (ctx) => {
+    const result = await this.repo.withLockedConfig(input.configId, async (ctx) => {
       const trace = selectCandidates(ctx.rows, input.identity);
       const plan = planConsumption(trace, input.quantity);
 
       if (!plan.ok) {
-        throw new InsufficientCapacityError(plan.requested, plan.available, plan.shortfall);
+        await ctx.client.query(
+          `INSERT INTO reservation_refusals
+             (config_id, channel, owner_id, requested, available, shortfall, actor)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [input.configId, input.identity.kind === 'owner' ? input.identity.channel : input.identity.kind,
+            input.identity.kind === 'owner' ? input.identity.ownerId : null,
+            plan.requested, plan.available, plan.shortfall, input.actor],
+        );
+        return { ok: false as const, requested: plan.requested, available: plan.available, shortfall: plan.shortfall };
       }
 
       const token = randomUUID();
@@ -72,8 +80,10 @@ export class ReservationService {
         });
       }
 
-      return { token, expiresAt, splits: plan.splits, trace };
+      return { ok: true as const, token, expiresAt, splits: plan.splits, trace };
     });
+    if (!result.ok) throw new InsufficientCapacityError(result.requested, result.available, result.shortfall);
+    return { token: result.token, expiresAt: result.expiresAt, splits: result.splits, trace: result.trace };
   }
 
   /** Load a config's rows in engine shape, without locking. */
@@ -170,6 +180,16 @@ export class ReservationService {
         });
         splits.push({ rowId: allocationId, step: 'primary', quantity: hold.quantity });
       }
+      await ctx.client.query(
+        `INSERT INTO crm_webhook_deliveries (event_key, event_type, payload, config_id)
+         VALUES ($1, 'booking.confirmed', $2::jsonb, $3)
+         ON CONFLICT (event_key) DO NOTHING`,
+        [`booking.confirmed:${token}`, JSON.stringify({
+          event: 'booking.confirmed', bookingRef, configId, token,
+          quantity: splits.reduce((sum, split) => sum + split.quantity, 0),
+          splits: splits.map((split) => ({ allocationId: split.rowId, quantity: split.quantity })),
+        }), configId],
+      );
       return { alreadyConfirmed: false, splits };
     });
   }

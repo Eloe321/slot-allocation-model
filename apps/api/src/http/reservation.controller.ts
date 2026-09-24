@@ -2,10 +2,13 @@ import { Body, Controller, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { ReservationService } from '../reservation/reservation.service.js';
 import { ConfirmDto, ReserveDto } from './dto.js';
 import { toIdentity } from './identity.js';
+import { DemoRoles } from '../demo/demo-access.js';
+import { ExpiryService } from '../reservation/expiry.service.js';
 
 @Controller()
+@DemoRoles('administrator', 'operator')
 export class ReservationController {
-  constructor(private readonly reservations: ReservationService) {}
+  constructor(private readonly reservations: ReservationService, private readonly expiry: ExpiryService) {}
 
   @Post('configs/:id/reservations')
   reserve(@Param('id', ParseIntPipe) id: number, @Body() body: ReserveDto) {
@@ -26,5 +29,10 @@ export class ReservationController {
   async release(@Param('token') token: string) {
     await this.reservations.release(token, 'api');
     return { ok: true };
+  }
+
+  @Post('reservations/:token/expire')
+  async expire(@Param('token') token: string) {
+    return { expired: await this.expiry.expireNow(token) };
   }
 }

@@ -65,8 +65,11 @@ below, and never in tracked uppercase as a section eyebrow.
 
 ## Layout
 
-Two columns on wide screens: the tree on the left (it is the subject), controls
-and trace on the right. Single column below 900px, tree first.
+The booking inspector uses two columns on wide screens: the tree on the left
+(it is the subject), controls and trace on the right. The manager form and
+report use full-width ruled sections and scrollable tables. The partner view
+keeps only the assigned inventory and activity. Single column below 900px,
+tree first.
 
 Spacing scale in rem: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2 / 3. Rhythm varies by
 section; panels are separated by rule lines rather than by shadow or card

@@ -7,8 +7,10 @@ import { CutoffService } from '../cutoff/cutoff.service.js';
 import { PG_POOL } from '../db/pool.js';
 import { IdentityDto } from './dto.js';
 import { toIdentity } from './identity.js';
+import { DemoRoles } from '../demo/demo-access.js';
 
 @Controller('configs')
+@DemoRoles('administrator', 'operator')
 export class AllocationController {
   constructor(
     private readonly reservations: ReservationService,

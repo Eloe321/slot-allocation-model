@@ -106,6 +106,16 @@ describe('pool ceiling constraints', () => {
     ).rejects.toThrow(/one_online_parent_per_config/);
   });
 
+  it.each([
+    ['counter', 'one_counter_direct_per_config'],
+    ['marketplace', 'one_marketplace_direct_per_config'],
+  ])('rejects a second %s direct row on one config', async (channel, constraint) => {
+    const { configId } = await seedConfig(pool);
+    await addRow(pool, configId, { channel, allocationType: 'direct', allocatedSlots: 10 });
+    await expect(addRow(pool, configId, { channel, allocationType: 'direct', allocatedSlots: 10 }))
+      .rejects.toThrow(new RegExp(constraint));
+  });
+
   it('rejects a second partner pool row on one config', async () => {
     const { configId } = await seedConfig(pool);
     await addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 80 });

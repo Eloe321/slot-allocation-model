@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: slot
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?Set DEMO_DB_PASSWORD}
+      POSTGRES_DB: slot_allocation
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slot -d slot_allocation"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    image: slot-allocation-demo
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      args:
+        NEXT_PUBLIC_API_URL: ${DEMO_PUBLIC_API_URL:?Set DEMO_PUBLIC_API_URL}
+    environment:
+      DATABASE_URL: postgres://slot:${DEMO_DB_PASSWORD}@db:5432/slot_allocation
+      WEB_ORIGIN: ${DEMO_WEB_ORIGIN:?Set DEMO_WEB_ORIGIN}
+      CRM_WEBHOOK_URL: ${CRM_WEBHOOK_URL:-}
+      CRM_WEBHOOK_SECRET: ${CRM_WEBHOOK_SECRET:-}
+      DEMO_TRUST_PROXY_HOPS: ${DEMO_TRUST_PROXY_HOPS:-1}
+      PORT: "4001"
+    command: ["sh", "-c", "pnpm db:migrate && pnpm --filter @slot/api db:seed:if-empty && pnpm --filter @slot/api start"]
+    ports:
+      - "127.0.0.1:4001:4001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: slot-allocation-demo
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      args:
+        NEXT_PUBLIC_API_URL: ${DEMO_PUBLIC_API_URL:?Set DEMO_PUBLIC_API_URL}
+    command: ["pnpm", "--filter", "@slot/web", "exec", "next", "start", "-H", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  demo_pgdata:

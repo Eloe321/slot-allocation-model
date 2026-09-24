@@ -1,0 +1,32 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint, typecheck, test, and build against PostgreSQL
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm verify 2>&1 | tee verify.log
+      - name: Upload verification log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-log
+          path: verify.log
+          if-no-files-found: ignore

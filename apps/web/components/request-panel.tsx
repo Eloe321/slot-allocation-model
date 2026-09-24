@@ -20,11 +20,14 @@ export function RequestPanel({
   onReserve,
   onRelease,
   onConfirm,
+  onExpire,
+  onCompete,
   onCutoff,
   reservation,
   sale,
   shortfall,
   busy,
+  competition,
 }: {
   tree: Tree;
   state: RequestState;
@@ -35,12 +38,15 @@ export function RequestPanel({
   onReserve: () => void;
   onRelease: () => void;
   onConfirm: () => void;
+  onExpire: () => void;
+  onCompete: () => void;
   onCutoff: () => void;
   reservation: Reservation | null;
   /** A completed sale. Terminal — the token can no longer be released. */
   sale: { bookingRef: string; seats: number } | null;
   shortfall: { requested: number; available: number; shortfall: number } | null;
   busy: boolean;
+  competition: string | null;
 }) {
   const needsOwner = state.channel === 'agency' || state.channel === 'reseller';
   // Only owners that actually exist on this config are offerable, so the UI
@@ -144,7 +150,7 @@ export function RequestPanel({
 
       <div className="actions">
         <button onClick={onPreview} disabled={busy}>Preview</button>
-        <button data-variant="primary" onClick={onReserve} disabled={busy}>Reserve</button>
+        <button data-variant="primary" onClick={onReserve} disabled={busy || !!reservation}>Reserve</button>
         {reservation ? (
           <button data-variant="primary" onClick={onConfirm} disabled={busy}>
             Confirm sale
@@ -153,6 +159,8 @@ export function RequestPanel({
         {reservation ? (
           <button onClick={onRelease} disabled={busy}>Release</button>
         ) : null}
+        {reservation ? <button onClick={onExpire} disabled={busy}>Expire hold now</button> : null}
+        <button onClick={onCompete} disabled={busy || !!reservation || !available} title="Run two simultaneous requests for all reachable seats, then release the winning hold">Try competing requests</button>
         <button onClick={onCutoff} disabled={busy} className="push">Apply cutoff</button>
       </div>
 
@@ -163,6 +171,7 @@ export function RequestPanel({
           <span className="num">{shortfall.shortfall}</span>.
         </p>
       ) : null}
+      {competition ? <p className="held-note" role="status">{competition}</p> : null}
 
       {sale ? (
         <p className="sold-note">

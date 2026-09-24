@@ -97,4 +97,16 @@ describe('ExpiryService.sweep', () => {
     );
     expect(rows[0].n).toBe(1);
   });
+
+  it('can advance one open hold through expiry for the guided demo', async () => {
+    const { configId } = await seedConfig(pool, 50);
+    const onlineId = await addRow(pool, configId, { channel: 'online', allocationType: 'direct', allocatedSlots: 50 });
+    const { token } = await service.reserve({ configId, identity: { kind: 'online' }, quantity: 6, actor: 'test' });
+    expect(await expiry.expireNow(token)).toBe(true);
+    expect(await expiry.expireNow(token)).toBe(false);
+    const allocation = await pool.query('SELECT held_slots FROM channel_allocations WHERE id = $1', [onlineId]);
+    expect(allocation.rows[0].held_slots).toBe(0);
+    const movements = await pool.query("SELECT event_type, reason FROM slot_movements WHERE token = $1 AND event_type = 'expire_hold'", [token]);
+    expect(movements.rows).toEqual([{ event_type: 'expire_hold', reason: 'guided demo expiry' }]);
+  });
 });

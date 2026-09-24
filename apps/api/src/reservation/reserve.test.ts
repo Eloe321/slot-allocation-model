@@ -135,4 +135,14 @@ describe('ReservationService.reserve', () => {
     ]);
     expect(rows[0].held_slots).toBe(0);
   });
+
+  it('audits a refused oversell attempt with its shortfall', async () => {
+    const { configId } = await tree();
+    await expect(service.reserve({ configId, identity: { kind: 'counter' }, quantity: 25, actor: 'test' })).rejects.toBeInstanceOf(InsufficientCapacityError);
+    const { rows } = await pool.query(
+      'SELECT channel, requested, available, shortfall, actor FROM reservation_refusals WHERE config_id = $1',
+      [configId],
+    );
+    expect(rows).toEqual([{ channel: 'counter', requested: 25, available: 20, shortfall: 5, actor: 'test' }]);
+  });
 });

@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import { AllocationRepository } from '../allocation/allocation.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { PG_POOL } from '../db/pool.js';
+import { ReservationNotFoundError } from './errors.js';
 
 /**
  * Returns seats from holds whose TTL has passed.
@@ -26,6 +27,31 @@ export class ExpiryService {
   async scheduledSweep(): Promise<void> {
     const count = await this.sweep();
     if (count > 0) this.logger.log(`expired ${count} reservation(s)`);
+  }
+
+  /** Advance one hold to expiry for the guided demo, using the same locked counter and ledger path. */
+  async expireNow(token: string): Promise<boolean> {
+    const found = await this.pool.query<{ config_id: string }>(
+      'SELECT config_id FROM slot_holds WHERE token = $1 LIMIT 1', [token],
+    );
+    if (!found.rows[0]) throw new ReservationNotFoundError(token);
+    return this.repo.withLockedConfig(Number(found.rows[0].config_id), async (ctx) => {
+      const holds = await ctx.client.query<{ id: string; allocation_id: string; quantity: number }>(
+        `SELECT id, allocation_id, quantity FROM slot_holds
+          WHERE token = $1 AND status = 'open' ORDER BY id FOR UPDATE`, [token],
+      );
+      if (holds.rows.length === 0) return false;
+      for (const hold of holds.rows) {
+        const allocationId = Number(hold.allocation_id);
+        await ctx.applyDelta(allocationId, { heldDelta: -hold.quantity });
+        await ctx.client.query("UPDATE slot_holds SET status = 'expired', expires_at = now() WHERE id = $1", [hold.id]);
+        await this.ledger.record(ctx.client, {
+          configId: ctx.configId, allocationId, eventType: 'expire_hold', quantity: hold.quantity,
+          actor: 'demo operator', token, reason: 'guided demo expiry',
+        });
+      }
+      return true;
+    });
   }
 
   /** Returns the number of reservation tokens expired. */

@@ -9,14 +9,16 @@ product
 Technical reviewers — hiring engineers and prospective freelance clients —
 giving this between ninety seconds and an hour, usually in a browser tab among
 twenty others. They are not operating a ferry. They are judging whether the
-author can reason about hard, stateful correctness problems.
+author can reason about hard, stateful correctness problems and turn that
+reasoning into a usable operations workflow.
 
 The job to be done: understand *why* partitioned capacity is difficult, and see
 that this implementation handles it, without reading source code.
 
 ## Product Purpose
 
-An inspector for a slot-allocation engine. It makes three normally-invisible
+A ferry allocation demo with administrator, operator, and partner views. The
+inspector remains the core explanation and makes three normally-invisible
 things visible:
 
 1. The allocation **tree** — capacity partitioned among sales channels, where a
@@ -28,11 +30,14 @@ things visible:
    why each candidate was included or skipped.
 
 Success: a reviewer who never opens the repository still understands the model
-and believes the implementation is careful.
+and believes the implementation is careful. The manager can preview and submit
+a valid allocation; the administrator can approve it and review reports; the
+operator can follow booking holds, sales, expiry, and cutoff; a partner sees
+only its own seats and movements.
 
 ## Brand Personality
 
-Precise, quiet, unhurried. A measuring instrument, not a product tour. It states
+Precise, quiet, unhurried. A measuring instrument with a guided workflow. It states
 numbers and lets them carry the argument. Nothing is decorated; nothing is sold.
 
 Three words: exact, legible, unshowy.

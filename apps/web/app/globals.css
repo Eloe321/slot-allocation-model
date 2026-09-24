@@ -170,6 +170,7 @@ main {
   border-color: var(--primary);
   color: oklch(1 0 0);
 }
+.scenarios .reset-scenario { margin-left: auto; }
 
 .teaches {
   margin: 1rem 0 0;
@@ -339,4 +340,83 @@ td[data-diverges] { color: var(--primary); font-weight: 600; }
   background: var(--surface);
   border-left: 1px solid var(--cap-sold);
   font-size: var(--text-sm);
+}
+
+/* --- demo roles and configuration --------------------------------------- */
+.role-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.role-switch label { font-weight: 600; }
+.role-switch span { color: var(--ink-muted); font-size: var(--text-xs); }
+
+.workspace-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule-strong);
+}
+.workspace-tabs button { border-color: transparent; }
+.workspace-tabs button[data-active] {
+  border-color: var(--rule-strong);
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.manager-intro { margin: 0.75rem 0 1.25rem; color: var(--ink-muted); }
+.manager-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+.manager-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+.manager-fields input { color: var(--ink); width: 100%; }
+.manager-rows-head, .manager-requests-head { margin-top: 2rem; }
+.manager-table { min-width: 55rem; }
+.manager-table select, .manager-table input { max-width: 100%; width: 100%; }
+.manager-table input[type='number'] { max-width: 6rem; }
+.manager-table td { vertical-align: top; }
+.manager-table td:last-child { width: 5rem; }
+.manager-preview { margin-top: 1.5rem; }
+.manager-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rule);
+}
+.manager-totals strong { display: inline-block; min-width: 2.5ch; font-size: var(--text-lg); }
+.manager-preview td.num { text-align: right; }
+.request-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; }
+.partner-view { display: flex; flex-direction: column; gap: 2.5rem; margin-top: 1.5rem; }
+.guided-demo { margin: 0.75rem 0 1.25rem; padding: 0.75rem 1rem; border-left: 2px solid var(--primary); background: var(--surface); font-size: var(--text-sm); }
+.report-view { margin-top: 1.5rem; }
+.report-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin: 1.25rem 0 2rem; }
+.report-metric { display: flex; flex-direction: column; border-top: 1px solid var(--rule-strong); padding-top: 0.5rem; }
+.report-metric span { color: var(--ink-muted); font-size: var(--text-xs); }
+.report-metric strong { font-size: var(--text-lg); font-weight: 600; }
+.crm-deliveries { margin-top: 2rem; }
+.crm-deliveries .panel-note { margin: 0.75rem 0; }
+
+@media (max-width: 700px) {
+  .manager-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .manager-fields { grid-template-columns: minmax(0, 1fr); }
+  .role-switch label { width: 100%; }
+  .role-switch select { width: 100%; }
 }
