@@ -1,6 +1,7 @@
 # Slot Allocation
 
 [![Verify](https://github.com/Eloe321/slot-allocation-model/actions/workflows/verify.yml/badge.svg)](https://github.com/Eloe321/slot-allocation-model/actions/workflows/verify.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A capacity-allocation engine for a ferry booking platform: a trip's seats are
 partitioned among sales channels — walk-up counter, online, marketplace,
@@ -9,6 +10,8 @@ under concurrent load, across a booking lifecycle of holds, sales, refunds and
 cutoff.
 
 **I build booking and capacity-allocation systems that prevent overselling across direct, partner, and reseller channels.** This repository includes a manager workflow, a guided booking demo, role-specific views, an inventory report, and a signed CRM webhook outbox. See the [case study](docs/CASE_STUDY.md), [API guide](docs/API.md), and [walkthrough outline](docs/WALKTHROUGH.md).
+
+**Try the public demo:** [slot-allocation-model.pages.dev](https://slot-allocation-model.pages.dev). The API runs on [Render](https://slot-allocation-api.onrender.com); the browser client is intentionally the primary entry point.
 
 This is a rebuild. The original is production software I wrote inside a
 proprietary multi-tenant platform (~20k lines) and cannot publish. This
@@ -99,7 +102,8 @@ pnpm verify               # starts PostgreSQL, provisions the test DB, migrates,
 ```
 
 Port 55432 rather than 5432 so this cannot collide with a PostgreSQL you already
-run. The API accepts any `localhost` origin, so a busy port 3000 is not fatal.
+run. When `WEB_ORIGIN` is unset, the API accepts any `localhost` origin, so a
+busy port 3000 is not fatal.
 
 Tests run against a **separate database** (`slot_allocation_test`, provisioned
 explicitly by `pnpm bootstrap` and `pnpm verify`) so they cannot wipe the
@@ -114,8 +118,9 @@ demo proposals and their approved sailings expire after 24 hours, with a cap of
 confirmed bookings to a CRM, configure `CRM_WEBHOOK_URL` and
 `CRM_WEBHOOK_SECRET` on the API; see the [signature and retry contract](docs/API.md#crm-booking-confirmation-webhook).
 
-A [disposable Docker deployment](docs/DEPLOYMENT.md) is included. A public URL
-and recorded walkthrough will be added after a host and domain are selected.
+A [disposable Docker deployment](docs/DEPLOYMENT.md) is included alongside the
+live Cloudflare Pages and Render deployment. Use the [100-second walkthrough
+script](docs/WALKTHROUGH.md) to evaluate the public demo end to end.
 
 ---
 

@@ -3,7 +3,7 @@ import nextPlugin from '@next/eslint-plugin-next';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/next-env.d.ts'] },
+  { ignores: ['**/dist/**', '**/.next/**', '**/out/**', '**/node_modules/**', '**/next-env.d.ts'] },
   { plugins: { '@next/next': nextPlugin } },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

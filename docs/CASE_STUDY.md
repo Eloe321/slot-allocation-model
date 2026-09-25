@@ -2,6 +2,8 @@
 
 > I build booking and capacity-allocation systems that prevent overselling across direct, partner, and reseller channels.
 
+**Live demo:** [slot-allocation-model.pages.dev](https://slot-allocation-model.pages.dev)
+
 ## Problem
 
 A ferry cabin has one physical seat count, while the operator promises portions of those seats to counter sales, direct online sales, agencies, and resellers. A parent pool can show more raw free seats than can actually be sold because children have claims inside it. In the seeded example, the online parent shows **65 raw free** but only **30 sellable** after its child allocations are netted out.
@@ -22,6 +24,14 @@ flowchart LR
   DB --> Report[Inventory report and CSV]
   API --> Report
 ```
+
+## Outcome
+
+The [live demo](https://slot-allocation-model.pages.dev) lets a prospective
+client move from capacity design to an approved sailing, then observe a hold,
+confirmation, release, cutoff, ledger entry, and report without real customer
+data or payments. It turns the allocation model into a focused example of an
+operator workflow that prevents overselling across direct and partner channels.
 
 ## Evidence
 

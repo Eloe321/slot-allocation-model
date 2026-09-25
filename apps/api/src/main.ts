@@ -4,6 +4,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { InsufficientCapacityError } from './reservation/errors.js';
 import { HttpException } from '@nestjs/common';
+import { allowedOrigins, isLocalDevelopmentOrigin } from './http/origin.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -16,12 +17,12 @@ async function bootstrap(): Promise<void> {
   // Any localhost port, because this runs only on a developer's own machine and
   // pinning one port breaks anyone whose 3000 is already taken. WEB_ORIGIN
   // overrides it if a specific origin is ever needed.
-  const allowed = process.env.WEB_ORIGIN;
+  const allowed = allowedOrigins(process.env.WEB_ORIGIN);
   app.enableCors({
     origin: allowed
       ? allowed
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) =>
-          callback(null, !origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)),
+          callback(null, isLocalDevelopmentOrigin(origin)),
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 

@@ -1,6 +1,8 @@
 # 100-second walkthrough outline
 
-This is a recording script for the public demo video. Recording and publishing remain pending a public demo URL.
+Use this script to record the [public demo](https://slot-allocation-model.pages.dev).
+It is structured for a 100-second portfolio walkthrough and follows the exact
+role and scenario sequence available in the deployed environment.
 
 | Time | Screen | Narration |
 |---|---|---|
